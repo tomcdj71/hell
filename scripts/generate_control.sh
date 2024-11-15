@@ -1,87 +1,95 @@
 #!/usr/bin/env bash
 set -e
-
-# Usage: package_single.sh <package_name> <install_dir> <tmpdir> <full_version> <current_date>
-
-# Input parameters
 PACKAGE_NAME="$1"
 INSTALL_DIR="$2"
 TMPDIR="$3"
 FULL_VERSION="$4"
 CURRENT_DATE="$5"
-
-# Map package name to package directory
 PACKAGE_DIR="package/${PACKAGE_NAME}"
-
-# Get username
 USERNAME=$(whoami)
 
-# Create package directory
+# Create necessary directories
 mkdir -p "$PACKAGE_DIR/DEBIAN"
 
-# Find the package file in tmpdir
-PACKAGE_FILE=$(ls "$TMPDIR" | grep "^${PACKAGE_NAME}_")
+echo "Debug Information:"
+echo "=================="
+echo "PACKAGE_NAME: $PACKAGE_NAME"
+echo "INSTALL_DIR: $INSTALL_DIR"
+echo "TMPDIR: $TMPDIR"
+echo "FULL_VERSION: $FULL_VERSION"
+echo "CURRENT_DATE: $CURRENT_DATE"
+echo "PACKAGE_DIR: $PACKAGE_DIR"
+echo "TMPDIR Content:"
+ls -lah "$TMPDIR"
+echo "=================="
+
+# Find the correct package file
+echo "Attempting to find package file matching: ${PACKAGE_NAME}"
+PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}" -print -quit)
 
 if [ -z "$PACKAGE_FILE" ]; then
   echo "Error: Package file for $PACKAGE_NAME not found in $TMPDIR"
+  echo "Contents of TMPDIR:"
+  tree -L 2 "$TMPDIR"
+  echo "Exiting with error."
   exit 1
 fi
 
-# Step 1: Extract control files and modify dependencies
+PACKAGE_FILE=$(basename "$PACKAGE_FILE")
+echo "Found package file: $PACKAGE_FILE"
 echo "Processing package $PACKAGE_FILE, package name is $PACKAGE_NAME, dest_dir is $PACKAGE_DIR"
 
-sudo dpkg -e "$TMPDIR/$PACKAGE_FILE" "$PACKAGE_DIR/DEBIAN"
-sudo chown -R "$USERNAME:$USERNAME" "$PACKAGE_DIR"
-control_file="$PACKAGE_DIR/DEBIAN/control"
+# Extract package metadata
+sudo dpkg -e "$TMPDIR/$PACKAGE_FILE" "$PACKAGE_DIR/DEBIAN" || {
+  echo "Error running dpkg -e on $TMPDIR/$PACKAGE_FILE"
+  exit 1
+}
 
-# Append COPYRIGHT message
+sudo chown -R "$USERNAME:$USERNAME" "$PACKAGE_DIR"
+
+control_file="$PACKAGE_DIR/DEBIAN/control"
 COPYRIGHT=" .
    Packaged by MediaEase on $CURRENT_DATE."
 echo "$COPYRIGHT" >> "$control_file"
 
 # Modify the 'Depends' field to lock to current version
 if [ "$PACKAGE_NAME" == "libtorrent-rasterbar-dev" ]; then
+  echo "Modifying 'Depends' field for $PACKAGE_NAME"
   sed -i "s/^\(Depends:.*libtorrent-rasterbar2.*(=\s*\)[^)]*\()\)/\1$FULL_VERSION\2/" "$control_file"
 elif [ "$PACKAGE_NAME" == "python3-libtorrent" ]; then
+  echo "Modifying 'Depends' field for $PACKAGE_NAME"
   sed -i "s/^\(Depends:.*libtorrent-rasterbar2.*(>=\s*\)[^)]*\()\)/\1$FULL_VERSION\2/" "$control_file"
 fi
 
+echo "Contents of $control_file after modification:"
 cat "$control_file"
 
-# Extract package files
-sudo dpkg -x "$TMPDIR/$PACKAGE_FILE" "$PACKAGE_DIR"
-sudo chown -R "$USERNAME:$USERNAME" "$PACKAGE_DIR"
+# Extract package contents
+echo "Extracting package contents to $PACKAGE_DIR"
+sudo dpkg -x "$TMPDIR/$PACKAGE_FILE" "$PACKAGE_DIR" || {
+  echo "Error running dpkg -x on $TMPDIR/$PACKAGE_FILE"
+  exit 1
+}
 
-# Step 2: Copy compiled files into package directory and update Installed-Size
+sudo chown -R "$USERNAME:$USERNAME" "$PACKAGE_DIR"
 echo "Processing package: $PACKAGE_NAME"
 
-# Ensure we are in the correct directory
 cd "$PACKAGE_DIR"
-
-# Ensure DEBIAN directory exists
-mkdir -p DEBIAN
 control_file="DEBIAN/control"
 
-# Extract old Installed-Size from control file
+# Update installed size
 old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
-
-# Copy files from INSTALL_DIR to package directory
 rsync -auv --existing "$INSTALL_DIR/" "./"
-
-# Calculate new installed size
 installed_size=$(du -sk . | cut -f1)
-
-# Compare and output the sizes
 echo "Old Installed-Size: $old_installed_size kB"
 echo "New Installed-Size: $installed_size kB"
-
-# Update Installed-Size in control file
 sed -i "s/^Installed-Size: .*/Installed-Size: $installed_size/" "$control_file"
 
-# Generate md5sums for the package
 echo "Generating md5sums for $PACKAGE_NAME"
 rm -f DEBIAN/md5sums
 find . -type f ! -path './DEBIAN/*' -exec md5sum {} \; > DEBIAN/md5sums
 
 # Return to the previous directory
 cd - > /dev/null
+
+echo "Completed processing for $PACKAGE_NAME"

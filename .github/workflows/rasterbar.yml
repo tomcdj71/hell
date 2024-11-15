@@ -1,16 +1,12 @@
-name: Compile Libtorrent-Rasterbar
+name: Compile Rasterbar
 
 on:
-  schedule:
-    - cron: "0 0 * * 0"
   push:
     branches:
       - main
-    paths:
-      - '.github/workflows/libtorrent-rasterbar.yml'
 
 jobs:
-  libtorrent_rasterbar:
+  rasterbar:
     runs-on: ubuntu-24.04
 
     env:
@@ -22,7 +18,7 @@ jobs:
       ARCHIVE_RASTERBAR_PATH: "${{ github.workspace }}/binaries/dist/archive/libtorrent-rasterbar"
       POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
       SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
-      #TIME_DIFF: 168
+      #TIME_DIFF: 168 # 7 days
       TIME_DIFF: 4800
 
     strategy:
@@ -101,6 +97,15 @@ jobs:
           DEV_PACKAGE_FILENAME="${DEV_PACKAGE_NAME}_${FULL_VERSION}_${ARCHITECTURE}.deb"
           PYTHON_PACKAGE_FILENAME="${PYTHON_PACKAGE_NAME}_${FULL_VERSION}_${ARCHITECTURE}.deb"
           LIBTORRENT_SO_VERSION="2.0"
+          TMPDIR=$(mktemp -d)
+          TMPDIR=${TMPDIR##*tmp.}
+          TMPDIR="${{ env.REPO_PATH }}/$TMPDIR"
+          mkdir -p $TMPDIR
+          INSTALL_DIR=$(mktemp -d)
+          INSTALL_DIR=${INSTALL_DIR##*tmp.}
+          INSTALL_DIR="${{ env.LIBTORRENT_PATH }}/$INSTALL_DIR"
+          echo "install_dir=${INSTALL_DIR}" >> $GITHUB_OUTPUT
+          echo "tmpdir=${TMPDIR}" >> $GITHUB_OUTPUT
           echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
           echo "dev_package_name=${DEV_PACKAGE_NAME}" >> $GITHUB_OUTPUT
           echo "debian_revision=${DEBIAN_REVISION}" >> $GITHUB_OUTPUT
@@ -114,6 +119,8 @@ jobs:
           echo "python_package_filename=${PYTHON_PACKAGE_FILENAME}" >> $GITHUB_OUTPUT
           echo "python_package_name=${PYTHON_PACKAGE_NAME}" >> $GITHUB_OUTPUT
           echo "libtorrent_so_version=${LIBTORRENT_SO_VERSION}" >> $GITHUB_OUTPUT
+          echo "Temp Directory: $TMPDIR"
+          echo "Install Directory: $INSTALL_DIR"
           echo "Upstream version: $UPSTREAM_VERSION"
           echo "Debian revision: $DEBIAN_REVISION"
           echo "Build number: $BUILD_NUMBER"
@@ -126,11 +133,6 @@ jobs:
           echo "Dev package filename: ${DEV_PACKAGE_FILENAME}"
           echo "Last Commit SHA: ${{ steps.libtorrent_rasterbar_update.outputs.commit_sha }}"
           echo "Last Commit date: ${{ steps.libtorrent_rasterbar_update.outputs.commit_date }}"
-
-      - name: Set up dependencies for libtorrent-rasterbar
-        if: steps.libtorrent_rasterbar_update.outputs.update_needed == 'true'
-        run: |
-          sudo gem install fpm
 
       - name: Install boost
         uses: MarkusJx/install-boost@v2.4.5
@@ -153,24 +155,26 @@ jobs:
       - name: Download official libtorrent-rasterbar apt package
         if: steps.libtorrent_rasterbar_update.outputs.update_needed == 'true'
         id: libtorrent_rasterbar_download
+        env: 
+          tmpdir: ${{ steps.determine_build.outputs.tmpdir }}
         run: |
-          TMPDIR=$(mktemp -d)
-          TMPDIR=${TMPDIR##*tmp.}
-          mkdir -p $TMPDIR
-          cd $TMPDIR
+          cd ${{ env.tmpdir }}
           sudo apt-get update
           packages=(libtorrent-rasterbar2 libtorrent-rasterbar-dev python3-libtorrent)
           for package in "${packages[@]}"; do
             real_name=$(apt-cache show ${package}* | grep -m1 "Filename" | cut -d " " -f2)
-            package=$(echo $real_name | rev | cut -d "/" -f1 | rev)
-            package=$(echo $package | cut -d "_" -f1)
-            apt-get download $package
+            real_package=$(echo $real_name | rev | cut -d "/" -f1 | rev)
+            real_package=$(echo $real_package | cut -d "_" -f1)
+            echo "Downloading $real_package"
+            apt-get download $real_package
+            echo "$real_package downloaded to ${{ env.tmpdir }}"
           done
-          echo tmpdir=$TMPDIR >> $GITHUB_OUTPUT
+          echo "temp dir is ${{ env.tmpdir }}"
+          echo "libtorrent_downloaded=true" >> $GITHUB_OUTPUT
 
       - name: Compile libtorrent-rasterbar
         id: compile_libtorrent_rasterbar
-        if: steps.libtorrent_rasterbar_update.outputs.update_needed == 'true'
+        if: steps.libtorrent_rasterbar_download.outputs.libtorrent_downloaded == 'true'
         env:
           package_name: ${{ steps.determine_build.outputs.package_name }}
           dev_package_name: ${{ steps.determine_build.outputs.dev_package_name }}
@@ -185,10 +189,11 @@ jobs:
           dev_package_filename: ${{ steps.determine_build.outputs.dev_package_filename }}
           python_package_filename: ${{ steps.determine_build.outputs.python_package_filename }}
           libtorrent_so_version: ${{ steps.determine_build.outputs.libtorrent_so_version }}
+          install_dir: ${{ steps.determine_build.outputs.install_dir }}
         run: |
           set -e
           cd ${{ env.LIBTORRENT_PATH }}
-          INSTALL_DIR=$(mktemp -d)
+          echo "Installing libtorrent-rasterbar to ${{ env.install_dir }}"
           CXXFLAGS="$CXXFLAGS ${{ env.HARDEN_FLAGS }}" \
           cmake \
             -B build \
@@ -196,7 +201,7 @@ jobs:
             -DBUILD_SHARED_LIBS=ON \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+            -DCMAKE_INSTALL_PREFIX="${{ env.install_dir }}" \
             -Dpython-bindings=ON \
             -Ddeprecated-functions=OFF \
             -DBOOST_ROOT="${{ env.BOOST_PATH }}" \
@@ -207,7 +212,6 @@ jobs:
             -Wno-dev
           cmake --build build
           cmake --install build
-          echo install_dir=$INSTALL_DIR >> $GITHUB_OUTPUT
 
       - name: Generate CONTROL Files
         id: generate_control_files
@@ -225,71 +229,23 @@ jobs:
           dev_package_filename: ${{ steps.determine_build.outputs.dev_package_filename }}
           python_package_filename: ${{ steps.determine_build.outputs.python_package_filename }}
           libtorrent_so_version: ${{ steps.determine_build.outputs.libtorrent_so_version }}
-          tmpdir: ${{ steps.libtorrent_rasterbar_download.outputs.tmpdir }}
-          install_dir: ${{ steps.compile_libtorrent_rasterbar.outputs.install_dir }}
+          tmpdir: ${{ steps.determine_build.outputs.tmpdir }}
+          install_dir: ${{ steps.determine_build.outputs.install_dir }}
         run: |
           set -e
-          for package_file in $(ls ${{ env.LIBTORRENT_PATH }}/${{ env.tmpdir }}); do
-            bash ${{ env.SCRIPTS_PATH }}/generate_control.sh
-            "${package_file}" \
-            "${{ env.install_dir }}" \
-            "${{ env.LIBTORRENT_PATH }}/${{ env.tmpdir }}" \
-            "${{ env.full_version }}" \
-            "${{ env.current_date }}"
-          done
-
-      - name: Copy Files into Package Directories
-        id: copy_files
-        if: steps.libtorrent_rasterbar_update.outputs.update_needed == 'true'
-        env:
-          package_name: ${{ steps.determine_build.outputs.package_name }}
-          dev_package_name: ${{ steps.determine_build.outputs.dev_package_name }}
-          python_package_name: ${{ steps.determine_build.outputs.python_package_name }}
-          upstream_version: ${{ steps.determine_build.outputs.upstream_version }}
-          debian_revision: ${{ steps.determine_build.outputs.debian_revision }}
-          build_number: ${{ steps.determine_build.outputs.build_number }}
-          architecture: ${{ steps.determine_build.outputs.architecture }}
-          current_date: ${{ steps.determine_build.outputs.current_date }}
-          full_version: ${{ steps.determine_build.outputs.full_version }}
-          package_filename: ${{ steps.determine_build.outputs.package_filename }}
-          dev_package_filename: ${{ steps.determine_build.outputs.dev_package_filename }}
-          python_package_filename: ${{ steps.determine_build.outputs.python_package_filename }}
-          libtorrent_so_version: ${{ steps.determine_build.outputs.libtorrent_so_version }}
-          install_dir: ${{ steps.compile_libtorrent_rasterbar.outputs.install_dir }}
-        run: |
-          set -e
-          PACKAGE_DIR="package/${{ env.package_name }}"
-          DEV_PACKAGE_DIR="package/${{ env.dev_package_name }}"
-          PYTHON_PACKAGE_DIR="package/${{ env.python_package_name }}"
-          declare -A package_dirs
-          package_dirs["libtorrent-rasterbar2.0t64"]=$PACKAGE_DIR
-          package_dirs["libtorrent-rasterbar-dev"]=$DEV_PACKAGE_DIR
-          package_dirs["python3-libtorrent"]=$PYTHON_PACKAGE_DIR
-          for package in libtorrent-rasterbar2.0t64 libtorrent-rasterbar-dev python3-libtorrent; do
-            pkg_dir=${package_dirs[$package]}
-            echo "Processing package: $package"
-            cd $pkg_dir
-            pkg_files=$(find . -type f ! -path './DEBIAN/*' | sed 's|^\./||')
-            cd - > /dev/null
-            mkdir -p "${pkg_dir}/usr"
-            control_file="${pkg_dir}/DEBIAN/control"
-            old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
-            rsync -auv --existing "${{ env.install_dir }}/" "${pkg_dir}/usr/"
-            installed_size=$(du -s "${pkg_dir}/usr" | cut -f1)
-            echo "Old Installed-Size: $old_installed_size kB"
-            echo "New Installed-Size: $installed_size kB"
-            sed -i "s/^Installed-Size: .*/Installed-Size: $installed_size/" "${pkg_dir}/DEBIAN/control"
-            echo "Generating md5sums for $pkg_dir"
-            cd "$pkg_dir"
-            mkdir -p DEBIAN
-            rm -f DEBIAN/md5sums
-            find . -type f ! -path './DEBIAN/*' -exec md5sum {} \; > DEBIAN/md5sums
-            cd - > /dev/null
-          done
+          for file in $(ls ${{ env.tmpdir }}); do
+            bash ${{ env.SCRIPTS_PATH }}/generate_control.sh \
+              "${file}" \
+              "${{ env.install_dir }}" \
+              "${{ env.tmpdir }}" \
+              "${{ env.full_version }}" \
+              "${{ env.current_date }}"
+            done
+          echo "control_files_generated=true" >> $GITHUB_OUTPUT
 
       - name: Build Packages
         id: build_packages
-        if: steps.libtorrent_rasterbar_update.outputs.update_needed == 'true'
+        if: steps.generate_control_files.outputs.control_files_generated == 'true'
         env:
           package_name: ${{ steps.determine_build.outputs.package_name }}
           dev_package_name: ${{ steps.determine_build.outputs.dev_package_name }}
@@ -298,29 +254,49 @@ jobs:
           dev_package_filename: ${{ steps.determine_build.outputs.dev_package_filename }}
           python_package_filename: ${{ steps.determine_build.outputs.python_package_filename }}
           upstream_version: ${{ steps.determine_build.outputs.upstream_version }}
+          tmp_dir: ${{ steps.determine_build.outputs.tmpdir }}
         run: |
           set -e
-          dpkg-deb --build package/${{ env.package_name }}
-          dpkg-deb --build package/${{ env.dev_package_name }}
-          dpkg-deb --build package/${{ env.python_package_name }}
           mkdir -p "${{ env.POOL_PATH }}"
-          mv package/${{ env.package_name }}.deb "${{ env.POOL_PATH }}/${{ env.package_filename }}"
-          mv package/${{ env.dev_package_name }}.deb "${{ env.POOL_PATH }}/${{ env.dev_package_filename }}"
-          mv package/${{ env.python_package_name }}.deb "${{ env.POOL_PATH }}/${{ env.python_package_filename }}"
-          CHECKSUM=$(sha256sum "${{ env.POOL_PATH }}/${{ env.package_filename }}" | awk '{ print $1 }')
-          DEV_CHECKSUM=$(sha256sum "${{ env.POOL_PATH }}/${{ env.dev_package_filename }}" | awk '{ print $1 }')
-          PYTHON_CHECKSUM=$(sha256sum "${{ env.POOL_PATH }}/${{ env.python_package_filename }}" | awk '{ print $1 }')
-          echo "checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
-          echo "dev_checksum=${DEV_CHECKSUM}" >> $GITHUB_OUTPUT
-          echo "python_checksum=${PYTHON_CHECKSUM}" >> $GITHUB_OUTPUT
-          if [ -f "${{ env.POOL_PATH }}/${{ env.package_filename }}" ] && [ -f "${{ env.POOL_PATH }}/${{ env.dev_package_filename }}" ] && [ -f "${{ env.POOL_PATH }}/${{ env.python_package_filename }}" ]; then
-            echo "Packages built successfully."
-            echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
-          else
-            echo "Error: Packages not found in ${{ env.POOL_PATH }}"
-            echo "libtorrent_packaged=false" >> $GITHUB_OUTPUT
-          fi
-          echo "commit_message=Update ${{ env.package_name }}, ${{ env.dev_package_name }}, and ${{ env.python_package_name }} to v${{ env.upstream_version }} [automated]" >> $GITHUB_OUTPUT
+          base_dir=$(find ${{ github.workspace }} -type d -name "package" | head -n1)
+          ls -lah $base_dir
+          cd $base_dir
+          for package in "${{ env.package_name }}" "${{ env.dev_package_name }}" "${{ env.python_package_name }}"; do
+            echo "Building package: $package"
+            if [ -d "$package" ]; then
+              dpkg-deb --build "$package" || {
+                echo "Error building package: $package"
+                exit 1
+              }
+              PACKAGE_FILE="${package}_${{ env.full_version }}_amd64.deb"
+              echo "$PACKAGE_FILE created successfully."
+              echo "Generating checksum for $PACKAGE_FILE"
+              CHEKSUM=$(sha256sum "$package.deb" | awk '{ print $1 }')
+              echo "Checksum: $CHEKSUM"
+              case $package in
+                "${{ env.package_name }}")
+                  echo "package_checksum: $CHEKSUM" >> $GITHUB_OUTPUT
+                  ;;
+                "${{ env.dev_package_name }}")
+                  echo "dev_package_checksum: $CHEKSUM" >> $GITHUB_OUTPUT
+                  ;;
+                "${{ env.python_package_name }}")
+                  echo "python_package_checksum: $CHEKSUM" >> $GITHUB_OUTPUT
+                  ;;
+              esac
+              echo "${package}_checksum: $CHEKSUM" >> $GITHUB_OUTPUT
+              mv "$package.deb" "${{ env.POOL_PATH }}/$PACKAGE_FILE" || {
+                echo "Error moving package: $PACKAGE_FILE"
+                exit 1
+              }
+              echo "$PACKAGE_FILE moved to ${{ env.POOL_PATH }}"
+              echo "Package $PACKAGE_FILE built successfully."
+            else
+              echo "Error: Directory $package does not exist"
+              exit 1
+            fi
+          done
+          echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
       - name: Archive and Upload libtorrent-rasterbar Package
         id: archive_packages
@@ -368,9 +344,9 @@ jobs:
           package_name: ${{ steps.determine_build.outputs.package_name }}
           dev_package_name: ${{ steps.determine_build.outputs.dev_package_name }}
           python_package_name: ${{ steps.determine_build.outputs.python_package_name }}
-          checksum: ${{ steps.build_packages.outputs.checksum }}
-          dev_checksum: ${{ steps.build_packages.outputs.dev_checksum }}
-          python_checksum: ${{ steps.build_packages.outputs.python_checksum }}
+          package_checksum: ${{ steps.build_packages.outputs.package_checksum }}
+          dev_package_checksum: ${{ steps.build_packages.outputs.dev_package_checksum }}
+          python_package_checksum: ${{ steps.build_packages.outputs.python_package_checksum }}
           full_version: ${{ steps.determine_build.outputs.full_version }}
           current_date: ${{ steps.determine_build.outputs.current_date }}
         with:
