@@ -57,6 +57,7 @@ jobs:
           branch: ${{ matrix.branch }}
         run: |
           current_time=$(date +%s)
+          BRANCH="${branch}"
           commit_info=$(curl -s "https://api.github.com/repos/arvidn/libtorrent/commits?sha=${BRANCH}&per_page=1")
           COMMIT_DATE=$(echo "$commit_info" | jq -r '.[0].commit.committer.date')
           COMMIT_SHA=$(echo "$commit_info" | jq -r '.[0].sha')
@@ -77,7 +78,7 @@ jobs:
             echo "No recent updates on branch '${branch}'."
           fi
           echo "UPDATE_NEEDED=${UPDATE_NEEDED}" >> $GITHUB_OUTPUT
-          variables=(branch COMMIT_DATE COMMIT_SHA COMMIT_EPOCH time_diff UPDATE_NEEDED)
+          variables=(BRANCH COMMIT_DATE COMMIT_SHA COMMIT_EPOCH time_diff UPDATE_NEEDED)
           variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
           for variable in "${variables_sorted[@]}"; do
             lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
@@ -232,13 +233,9 @@ jobs:
               "${current_date}" \
               "${POOL_PATH}"
             CHECKSUM_FILE="${tmp_dir}/checksums/${package}.sha256"
-            if [ -f "$CHECKSUM_FILE" ]; then
-              CHECKSUM=$(cat "$CHECKSUM_FILE")
-              echo "${package}_checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
-            else
-              echo "Error: Checksum file $CHECKSUM_FILE not found"
-              exit 1
-            fi
+            CHECKSUM=$(cat "$CHECKSUM_FILE")
+            package=$(echo $package | sed 's/[-.]/_/g')
+            echo "${package}_checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
           done
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
