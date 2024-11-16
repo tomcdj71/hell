@@ -1,0 +1,327 @@
+name: Compile Rasterbar
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/rasterbar.yml'
+
+jobs: 
+  rasterbar:
+    runs-on: ubuntu-24.04
+
+    env:
+      BOOST_PATH: "${{ github.workspace }}/boost"
+      HARDEN_FLAGS: "-D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS"
+      LIBTORRENT_PATH: "${{ github.workspace }}/libtorrent"
+      REPO_PATH: "${{ github.workspace }}/binaries"
+      CURRENT_RASTERBAR_PATH: "${{ github.workspace }}/binaries/dist/current/libtorrent-rasterbar"
+      ARCHIVE_RASTERBAR_PATH: "${{ github.workspace }}/binaries/dist/archive/libtorrent-rasterbar"
+      POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
+      SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
+      #TIME_DIFF: 168 # 7 days
+      TIME_DIFF: 4800
+
+    strategy:
+      max-parallel: 1
+      matrix:
+        include:
+          - branch: RC_2_0
+            package_name: libtorrent-rasterbar2.0t64
+            dev_package_name: libtorrent-rasterbar-dev
+            python_package_name: python3-libtorrent
+            package_version_prefix: 2.0
+            architecture: amd64
+            boost_version: 1.86.0
+            boost_platform_version: 22.04
+
+    steps:
+      - uses: tecolicom/actions-use-apt-tools@v1
+        with:
+          tools: build-essential g++ autoconf automake libtool libncurses-dev libncurses6 libncursesw6 dstat curl git autoconf-archive bc checkinstall dos2unix dstat fontconfig ruby-full libcppunit-dev libcurl4-openssl-dev python3-dev autotools-dev libicu-dev libbz2-dev libfontconfig1 libfontconfig1-dev libsigc++-2.0-dev libssl-dev mediainfo pkg-config rar screen sysstat unzip zip zlib1g-dev libboost-tools-dev libboost-dev libboost-all-dev libboost-system-dev ninja-build cmake pcp python3 python3-pip python3-setuptools python3-wheel libxkbcommon-x11-dev libxcb-cursor-dev libgtk-3-dev libcairo2-dev libgirepository1.0-dev gobject-introspection
+          cache: false 
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ env.REPO_PATH }}
+
+      - name: Track libtorrent updates
+        id: libtorrent_rasterbar_update
+        env:
+          time_diff: ${{ env.TIME_DIFF }}
+          branch: ${{ matrix.branch }}
+        run: |
+          current_time=$(date +%s)
+          commit_info=$(curl -s "https://api.github.com/repos/arvidn/libtorrent/commits?sha=${BRANCH}&per_page=1")
+          COMMIT_DATE=$(echo "$commit_info" | jq -r '.[0].commit.committer.date')
+          COMMIT_SHA=$(echo "$commit_info" | jq -r '.[0].sha')
+          if [ "$COMMIT_DATE" == "null" ] || [ -z "$COMMIT_DATE" ]; then
+            echo "Warning: Unable to fetch the latest commit date for branch '${branch}'. Assuming no updates."
+            echo "UPDATE_NEEDED=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          COMMIT_EPOCH=$(date -d "$COMMIT_DATE" +%s)
+          time_diff=$(( (current_time - COMMIT_EPOCH) / 3600 ))
+          COMMIT_SINCE="Last commit on branch '${branch}' was $time_diff hours ago."
+          echo "$COMMIT_SINCE"
+          if (( time_diff <= ${time_diff} )); then
+            UPDATE_NEEDED=true
+            echo "Branch '${branch}' has been updated within the last 48 hours."
+          else
+            UPDATE_NEEDED=false
+            echo "No recent updates on branch '${branch}'."
+          fi
+          echo "UPDATE_NEEDED=${UPDATE_NEEDED}" >> $GITHUB_OUTPUT
+          variables=(branch COMMIT_DATE COMMIT_SHA COMMIT_EPOCH time_diff UPDATE_NEEDED)
+          variables_sorted=($(echo "${variables[@]}" | tr ' ' '\n' | sort | tr '\n' ' ')
+          variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
+          for variable in "${variables_sorted[@]}"; do
+            lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
+            upper_variable=$(echo "$variable" | tr '[:lower:]' '[:upper:]')
+            value="${!upper_variable}"
+            echo "${upper_variable} : ${value}"
+            echo "${lower_variable}=${value}" >> $GITHUB_OUTPUT
+          done
+
+      - name: Determine Debian Build Number
+        id: determine_build
+        if: steps.libtorrent_rasterbar_update.outputs.update_needed == 'true'
+        run: |
+          PACKAGE_NAME="${{ matrix.package_name }}"
+          DEV_PACKAGE_NAME="${{ matrix.dev_package_name }}"
+          PYTHON_PACKAGE_NAME="${{ matrix.python_package_name }}"
+          UPSTREAM_VERSION=$(curl -s "https://api.github.com/repos/arvidn/libtorrent/tags?per_page=100" | jq -r '.[].name' | grep -E '^v2\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 | sed 's/^v//')
+          if [ -z "$UPSTREAM_VERSION" ]; then
+            echo "Error: Unable to determine the latest upstream version."
+            exit 1
+          fi
+          DEBIAN_REVISION="1.1"
+          BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME" "$UPSTREAM_VERSION" "${{ env.CURRENT_RASTERBAR_PATH }}")
+          if [ "$BUILD_NUMBER" == "build1" ]; then
+            BUILD_NUMBER="build2"
+          fi
+          BUILD_NUMBER="${DEBIAN_REVISION}${BUILD_NUMBER}"
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          ARCHITECTURE="${{ matrix.architecture }}"
+          FULL_VERSION="${UPSTREAM_VERSION}-${BUILD_NUMBER}"
+          PACKAGE_FILENAME="${PACKAGE_NAME}_${FULL_VERSION}_${ARCHITECTURE}.deb"
+          DEV_PACKAGE_FILENAME="${DEV_PACKAGE_NAME}_${FULL_VERSION}_${ARCHITECTURE}.deb"
+          PYTHON_PACKAGE_FILENAME="${PYTHON_PACKAGE_NAME}_${FULL_VERSION}_${ARCHITECTURE}.deb"
+          LIBTORRENT_SO_VERSION="2.0"
+          TMP_DIR=$(mktemp -d)
+          TMP_DIR=${TMP_DIR##*tmp.}
+          TMP_DIR="${{ env.REPO_PATH }}/$TMP_DIR"
+          mkdir -p $TMP_DIR
+          INSTALL_DIR=$(mktemp -d)
+          INSTALL_DIR=${INSTALL_DIR##*tmp.}
+          INSTALL_DIR="${{ env.LIBTORRENT_PATH }}/$INSTALL_DIR"
+          COMMIT_MESSAGE="Update ${PACKAGE_NAME}, ${DEV_PACKAGE_NAME}, and ${PYTHON_PACKAGE_NAME} to v${UPSTREAM_VERSION} [automated]"
+          variables=(PACKAGE_NAME DEV_PACKAGE_NAME PYTHON_PACKAGE_NAME DEBIAN_REVISION BUILD_NUMBER UPSTREAM_VERSION CURRENT_DATE ARCHITECTURE FULL_VERSION PACKAGE_FILENAME DEV_PACKAGE_FILENAME PYTHON_PACKAGE_FILENAME LIBTORRENT_SO_VERSION TMP_DIR INSTALL_DIR COMMIT_MESSAGE)
+          variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
+          for variable in "${variables_sorted[@]}"; do
+            lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
+            upper_variable=$(echo "$variable" | tr '[:lower:]' '[:upper:]')
+            value="${!upper_variable}"
+            echo "${upper_variable} : ${value}"
+            echo "${lower_variable}=${value}" >> $GITHUB_OUTPUT
+          done
+
+      - name: Install boost
+        uses: MarkusJx/install-boost@v2.4.5
+        id: install-boost
+        if: steps.libtorrent_rasterbar_update.outputs.update_needed == 'true'
+        with:
+          boost_version: ${{ matrix.boost_version }}
+          boost_install_dir: ${{ env.BOOST_PATH }}
+          platform_version: ${{ matrix.boost_platform_version }}
+
+      - name: Checkout libtorrent Repository
+        if: steps.libtorrent_rasterbar_update.outputs.update_needed == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: arvidn/libtorrent
+          ref: ${{ matrix.branch }}
+          path: ${{ env.LIBTORRENT_PATH }}
+          submodules: recursive
+      
+      - name: Download official libtorrent-rasterbar apt package
+        if: steps.libtorrent_rasterbar_update.outputs.update_needed == 'true'
+        id: libtorrent_rasterbar_download
+        env: 
+          tmp_dir: ${{ steps.determine_build.outputs.tmp_dir }}
+        run: |
+          cd ${tmp_dir}
+          sudo apt-get update
+          packages=(libtorrent-rasterbar2 libtorrent-rasterbar-dev python3-libtorrent)
+          for package in "${packages[@]}"; do
+            real_name=$(apt-cache show ${package}* | grep -m1 "Filename" | cut -d " " -f2)
+            real_package=$(echo $real_name | rev | cut -d "/" -f1 | rev)
+            real_package=$(echo $real_package | cut -d "_" -f1)
+            echo "Downloading $real_package"
+            apt-get download $real_package
+            echo "$real_package downloaded to ${tmp_dir}"
+          done
+          echo "temp dir is ${tmp_dir}"
+          echo "libtorrent_downloaded=true" >> $GITHUB_OUTPUT
+
+      - name: Compile libtorrent-rasterbar
+        id: compile_libtorrent_rasterbar
+        if: steps.libtorrent_rasterbar_download.outputs.libtorrent_downloaded == 'true'
+        env:
+          package_name: ${{ steps.determine_build.outputs.package_name }}
+          dev_package_name: ${{ steps.determine_build.outputs.dev_package_name }}
+          python_package_name: ${{ steps.determine_build.outputs.python_package_name }}
+          upstream_version: ${{ steps.determine_build.outputs.upstream_version }}
+          debian_revision: ${{ steps.determine_build.outputs.debian_revision }}
+          build_number: ${{ steps.determine_build.outputs.build_number }}
+          architecture: ${{ steps.determine_build.outputs.architecture }}
+          current_date: ${{ steps.determine_build.outputs.current_date }}
+          full_version: ${{ steps.determine_build.outputs.full_version }}
+          package_filename: ${{ steps.determine_build.outputs.package_filename }}
+          dev_package_filename: ${{ steps.determine_build.outputs.dev_package_filename }}
+          python_package_filename: ${{ steps.determine_build.outputs.python_package_filename }}
+          libtorrent_so_version: ${{ steps.determine_build.outputs.libtorrent_so_version }}
+          install_dir: ${{ steps.determine_build.outputs.install_dir }}
+        run: |
+          set -e
+          cd ${{ env.LIBTORRENT_PATH }}
+          echo "Installing libtorrent-rasterbar to ${install_dir}"
+          CXXFLAGS="$CXXFLAGS ${{ env.HARDEN_FLAGS }}" \
+          cmake \
+            -B build \
+            -G "Ninja" \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_INSTALL_PREFIX="${install_dir}" \
+            -Dpython-bindings=ON \
+            -Ddeprecated-functions=OFF \
+            -DBOOST_ROOT="${{ env.BOOST_PATH }}" \
+            -DBoost_USE_STATIC_LIBS=OFF \
+            -DBoost_USE_STATIC_RUNTIME=OFF \
+            -Dbuild_tools=ON \
+            -Dpython-egg-info=ON \
+            -Wno-dev
+          cmake --build build --parallel $(nproc)
+          cmake --install build --parallel $(nproc)
+          echo "libtorrent_compiled=true" >> $GITHUB_OUTPUT
+
+      - name: Generate Deb Files
+        if: steps.compile_libtorrent_rasterbar.outputs.libtorrent_compiled == 'true'
+        id: generate_deb_files
+        env:
+          package_name: ${{ steps.determine_build.outputs.package_name }}
+          dev_package_name: ${{ steps.determine_build.outputs.dev_package_name }}
+          python_package_name: ${{ steps.determine_build.outputs.python_package_name }}
+          current_date: ${{ steps.determine_build.outputs.current_date }}
+          full_version: ${{ steps.determine_build.outputs.full_version }}
+          tmp_dir: ${{ steps.determine_build.outputs.tmp_dir }}
+          install_dir: ${{ steps.determine_build.outputs.install_dir }}
+        run: |
+          set -e
+          for package in "${package_name}" "${dev_package_name}" "${python_package_name}"; do
+            bash "${SCRIPTS_PATH}/generate_control.sh" \
+              "${package}" \
+              "${install_dir}" \
+              "${tmp_dir}" \
+              "${full_version}" \
+              "${current_date}" \
+              "${POOL_PATH}"
+            CHECKSUM_FILE="${tmp_dir}/checksums/${package}.sha256"
+            if [ -f "$CHECKSUM_FILE" ]; then
+              CHECKSUM=$(cat "$CHECKSUM_FILE")
+              echo "${package}_checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
+            else
+              echo "Error: Checksum file $CHECKSUM_FILE not found"
+              exit 1
+            fi
+          done
+          echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
+
+      - name: Archive and Upload libtorrent-rasterbar Package
+        id: archive_packages
+        if: steps.generate_deb_files.outputs.libtorrent_packaged == 'true'
+        env:
+          package_filename: ${{ steps.determine_build.outputs.package_filename }}
+          dev_package_filename: ${{ steps.determine_build.outputs.dev_package_filename }}
+          python_package_filename: ${{ steps.determine_build.outputs.python_package_filename }}
+          pool_path: ${{ env.POOL_PATH }}
+          current_rasterbar_path: ${{ env.CURRENT_RASTERBAR_PATH }}
+          archive_rasterbar_path: ${{ env.ARCHIVE_RASTERBAR_PATH }}
+          scripts_path: ${{ env.SCRIPTS_PATH }}
+        run: |
+          set -e
+          for package in "${package_filename}" "${dev_package_filename}" "${python_package_filename}"; do
+            if [ -f "${pool_path}/$package" ]; then
+              echo "Archiving $package"
+              bash "${scripts_path}/archive_packages.sh" \
+                "${current_rasterbar_path}" \
+                "${archive_rasterbar_path}" \
+                "${pool_path}/${package}"
+            else
+              echo "Error: Package $package not found in ${pool_path}"
+            fi
+          done
+          echo "archive_processed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and Push Package
+        if: steps.archive_packages.outputs.archive_processed == 'true'
+        uses: EndBug/add-and-commit@v9
+        env:
+          commit_message: ${{ steps.determine_build.outputs.commit_message }}
+          author_email: "${{ secrets.COMMITER_EMAIL }}"
+          author_name: "${{ secrets.COMMITER_NAME }}"
+        with:
+          author_name: "${{ env.author_name }}"
+          author_email: "${{ env.author_email }}"
+          default_author: user_info
+          message: ${{ env.commit_message }}
+          cwd: "./binaries"
+          add: |
+            dist/current/
+            dist/archive/
+          push: true
+          pull: "--rebase --autostash"
+
+      - name: Trigger Update Manifest Workflow
+        if: steps.archive_packages.outputs.archive_processed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        env:
+          package_name: ${{ steps.determine_build.outputs.package_name }}
+          dev_package_name: ${{ steps.determine_build.outputs.dev_package_name }}
+          python_package_name: ${{ steps.determine_build.outputs.python_package_name }}
+          full_version: ${{ steps.determine_build.outputs.full_version }}
+          current_date: ${{ steps.determine_build.outputs.current_date }}
+          package_checksum: ${{ steps.generate_deb_files.outputs.libtorrent_rasterbar2_0t64_checksum }}
+          dev_package_checksum: ${{ steps.generate_deb_files.outputs.libtorrent_rasterbar_dev_checksum }}
+          python_package_checksum: ${{ steps.generate_deb_files.outputs.python3_libtorrent_checksum }}
+        with:
+          event-type: update-manifest
+          client-payload: |
+            {
+              "package_updates": {
+                "${{ env.package_name }}": {
+                  "checksum": "${{ env.package_checksum }}",
+                  "version": "${{ env.full_version }}",
+                  "category": "libtorrent-rasterbar",
+                  "build_date": "${{ env.current_date }}"
+                },
+                "${{ env.dev_package_name }}": {
+                  "checksum": "${{ env.dev_package_checksum }}",
+                  "version": "${{ env.full_version }}",
+                  "category": "libtorrent-rasterbar",
+                  "build_date": "${{ env.current_date }}"
+                },
+                "${{ env.python_package_name }}": {
+                  "checksum": "${{ env.python_package_checksum }}",
+                  "version": "${{ env.full_version }}",
+                  "category": "libtorrent-rasterbar",
+                  "build_date": "${{ env.current_date }}"
+                }
+              }
+            }

@@ -1,0 +1,147 @@
+name: Create Release
+
+on:
+  repository_dispatch:
+    types: [create-release]
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+
+    env:
+      RELEASE_ASSETS: "${{ github.workspace }}/binaries/release_assets"
+      PRIVATE_REPO: "${{ github.workspace }}/stuff"
+      DIST_PATH: "${{ github.workspace }}/stuff/dist"
+
+    steps:
+      - name: Checkout Public Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          repo: MediaEase/binaries
+          path: binaries
+
+      - name: Checkout Private Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          repo: MediaEase/binaries-archive
+          path: stuff
+
+      - name: Get Release Info
+        run: |
+          echo "PACKAGE_NAME=${{ github.event.client_payload.package_name }}" >> $GITHUB_ENV
+          echo "PACKAGE_VERSION=${{ github.event.client_payload.package_version }}" >> $GITHUB_ENV
+
+      - name: Set Current Date
+        run: |
+          current_date=$(date +'%Y-%m-%d')
+          echo "current_date=${current_date}" >> $GITHUB_ENV
+
+      - name: Determine Packages to Include
+        id: determine_packages
+        run: |
+          PACKAGES_TO_INCLUDE=()
+          if [[ "${PACKAGE_NAME}" == "rtorrent" ]]; then
+            PACKAGES_TO_INCLUDE+=("mktorrent/mktorrent*.deb")
+            PACKAGES_TO_INCLUDE+=("libudns/libudns*.deb")
+            PACKAGES_TO_INCLUDE+=("xmlrpc-c/xmlrpc-c-stable*.deb")
+            PACKAGES_TO_INCLUDE+=("rtorrent/rtorrent_*.deb")
+            PACKAGES_TO_INCLUDE+=("libtorrent-rakshasa/libtorrent21_*.deb")
+            RELEASE_NAME="rtorrent ${PACKAGE_VERSION} Release"
+          elif [[ "${PACKAGE_NAME}" == "rtorrent-nightly" ]]; then
+            PACKAGES_TO_INCLUDE+=("mktorrent/mktorrent*.deb")
+            PACKAGES_TO_INCLUDE+=("libudns/libudns*.deb")
+            PACKAGES_TO_INCLUDE+=("xmlrpc-c/xmlrpc-c-advanced*.deb")
+            PACKAGES_TO_INCLUDE+=("rtorrent/rtorrent-nightly*.deb")
+            PACKAGES_TO_INCLUDE+=("libtorrent-rakshasa/libtorrent21-nightly*.deb")
+            RELEASE_NAME="rtorrent-nightly ${PACKAGE_VERSION} Release"
+          elif [[ "${PACKAGE_NAME}" == "deluge" ]]; then
+            PACKAGES_TO_INCLUDE+=("deluge/deluge-common_*${PACKAGE_VERSION}*.deb")
+            PACKAGES_TO_INCLUDE+=("deluge/deluged_*${PACKAGE_VERSION}*.deb")
+            PACKAGES_TO_INCLUDE+=("deluge/deluge-web_*${PACKAGE_VERSION}*.deb")
+            PACKAGES_TO_INCLUDE+=("libtorrent-rasterbar/libtorrent-rasterbar2.0t64_*.deb")
+            PACKAGES_TO_INCLUDE+=("libtorrent-rasterbar/python3-libtorrent-rasterbar2.0t64_*.deb")
+            RELEASE_NAME="Deluge ${PACKAGE_VERSION} Release"
+          elif [[ "${PACKAGE_NAME}" == "transmission" ]]; then
+            PACKAGES_TO_INCLUDE+=("transmission/transmission-common_*${PACKAGE_VERSION}*.deb")
+            PACKAGES_TO_INCLUDE+=("transmission/transmission-cli_*${PACKAGE_VERSION}*.deb")
+            RELEASE_NAME="Transmission ${PACKAGE_VERSION} Release"
+          elif [[ "${PACKAGE_NAME}" == "transmission-nightly" ]]; then
+            PACKAGES_TO_INCLUDE+=("transmission/transmission-common-nightly_*${PACKAGE_VERSION}*.deb")
+            PACKAGES_TO_INCLUDE+=("transmission/transmission-cli-nightly_*${PACKAGE_VERSION}*.deb")
+            RELEASE_NAME="Transmission ${PACKAGE_VERSION} (Nightly) Release"
+          elif [[ "${PACKAGE_NAME}" == "qbittorrent-nox" ]]; then
+            PACKAGES_TO_INCLUDE+=("qbittorrent/qbittorrent-nox_*${PACKAGE_VERSION}*.deb")
+            PACKAGES_TO_INCLUDE+=("libtorrent-rasterbar/libtorrent-rasterbar2.0t64_*.deb")
+            RELEASE_NAME="qBittorrent ${PACKAGE_VERSION} Release"
+          elif [[ "${PACKAGE_NAME}" == "qbittorrent-nox-nightly" ]]; then
+            PACKAGES_TO_INCLUDE+=("qbittorrent/qbittorrent-nox-nightly_*.deb")
+            PACKAGES_TO_INCLUDE+=("libtorrent-rasterbar/libtorrent-rasterbar2.0t64_*.deb")
+            RELEASE_NAME="qBittorrent ${PACKAGE_VERSION}-nightly Release"
+          elif [[ "${PACKAGE_NAME}" == "media-driver" ]]; then
+            PACKAGES_TO_INCLUDE+=("media-driver/mediadriver*.deb")
+            PACKAGES_TO_INCLUDE+=("libva/libva*.deb")
+            PACKAGES_TO_INCLUDE+=("gmmlib/gmmlib*.deb")
+            RELEASE_NAME="Intel Media Driver ${PACKAGE_VERSION} Release"
+          else
+            echo "Unknown package: ${PACKAGE_NAME}"
+            exit 1
+          fi
+          echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
+          echo "PACKAGES_TO_INCLUDE=${PACKAGES_TO_INCLUDE[@]}" >> $GITHUB_ENV
+
+      - name: Collect Packages and Generate Checksums
+        id: collect_packages
+        run: |
+          shopt -s nullglob
+          TMP_RELEASE_DIR=$(mktemp -d)
+          CHECKSUM_FILE="${TMP_RELEASE_DIR}/${{ env.PACKAGE_NAME }}_${{ env.PACKAGE_VERSION }}_checksums.txt"
+          touch "$CHECKSUM_FILE"
+          IFS=' ' read -r -a PACKAGE_PATTERNS <<< "${PACKAGES_TO_INCLUDE}"
+          for pattern in "${PACKAGE_PATTERNS[@]}"; do
+            package_files=( ${{ env.DIST_PATH }}/current/${pattern} )
+            if [ ${#package_files[@]} -eq 0 ]; then
+              echo "Error: No packages found for pattern: $pattern"
+              exit 1
+            fi
+            for file in "${package_files[@]}"; do
+              if [[ -f "$file" ]]; then
+                echo "Including package: $file"
+                cp "$file" "${TMP_RELEASE_DIR}/"
+                checksum=$(sha256sum "$file" | awk '{print $1}')
+                package_name=$(basename "$file")
+                echo "${package_name}: ${checksum}" >> "$CHECKSUM_FILE"
+                echo "Built on: ${{ env.current_date }}" >> "$CHECKSUM_FILE"
+              else
+                echo "Warning: Package not found: $file"
+              fi
+            done
+          done
+          echo "tmp_release_dir=${TMP_RELEASE_DIR}" >> $GITHUB_OUTPUT
+
+      - name: Create Release Archive
+        run: |
+          TMP_RELEASE_DIR="${{ steps.collect_packages.outputs.tmp_release_dir }}"
+          ARCHIVE_FILE="${{ env.PACKAGE_NAME }}_${{ env.PACKAGE_VERSION }}.tar.gz"
+          cd "$TMP_RELEASE_DIR"
+          mkdir -p "${{ env.RELEASE_ASSETS }}/${{ env.PACKAGE_NAME }}"
+          if [ -f "${{ env.RELEASE_ASSETS }}/${{ env.PACKAGE_NAME }}/${ARCHIVE_FILE}" ]; then
+            rm "${{ env.RELEASE_ASSETS }}/${{ env.PACKAGE_NAME }}/${ARCHIVE_FILE}"
+          fi
+          tar cvzf - -C "$TMP_RELEASE_DIR" . > "${{ env.RELEASE_ASSETS }}/${{ env.PACKAGE_NAME }}/${ARCHIVE_FILE}"
+          cd 
+          rm -rf "$TMP_RELEASE_DIR"
+
+      - name: Commit and Push Release Archive
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: "tomcdj71"
+          author_email: "contact.tomc@yahoo.fr"
+          default_author: user_info
+          message: "Update ${{ env.PACKAGE_NAME }} assets to v${{ env.PACKAGE_VERSION }} [automated]"
+          cwd: "${{ env.RELEASE_ASSETS }}"
+          add: |
+            binaries/release_assets/${{ env.PACKAGE_NAME }}/
+          push: true
+          pull: "--rebase --autostash"

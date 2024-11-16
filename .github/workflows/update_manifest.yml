@@ -1,0 +1,50 @@
+name: Update Manifest
+
+on:
+  repository_dispatch:
+    types: [update-manifest]
+
+jobs:
+  update_manifest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Binaries Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -yqq
+          sudo apt-get install -yqq libtool curl git autotools-dev pkg-config python3  python3-dev 
+          sudo apt-get install python3-pip python3-setuptools python3-wheel python3-gi python3-gi-cairo python3-yaml yamllint
+          pip install --upgrade pip
+          pip install pyyaml yamllint
+
+      - name: Update manifest.yaml
+        id: update_manifest
+        run: |
+          set -e
+          python3 scripts/update_manifest.py \
+            "./" \
+            '${{ toJson(github.event.client_payload) }}'
+          yamllint -d relaxed manifest.yaml
+          git add .
+          echo "manifest_updated=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and Push Updated Manifest
+        if: steps.update_manifest.outputs.manifest_updated == 'true'
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: "tomcdj71"
+          author_email: "contact.tomc@yahoo.fr"
+          default_author: user_info
+          message: "Update manifest.yaml with new packages [automated]"
+          push: true
+          pull: "--rebase --autostash"
