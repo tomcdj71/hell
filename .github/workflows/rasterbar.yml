@@ -78,7 +78,6 @@ jobs:
           fi
           echo "UPDATE_NEEDED=${UPDATE_NEEDED}" >> $GITHUB_OUTPUT
           variables=(branch COMMIT_DATE COMMIT_SHA COMMIT_EPOCH time_diff UPDATE_NEEDED)
-          variables_sorted=($(echo "${variables[@]}" | tr ' ' '\n' | sort | tr '\n' ' ')
           variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
           for variable in "${variables_sorted[@]}"; do
             lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
