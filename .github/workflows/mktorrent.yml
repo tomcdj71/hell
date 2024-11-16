@@ -40,7 +40,9 @@ jobs:
           time_diff: ${{ env.TIME_DIFF }}
         run: |
           set -e
-          REPO_URL="https://github.com/MediaEase/mktorrent"
+          REPO="MediaEase/mktorrent"
+          REPO_URL="https://github.com/${REPO}"
+          REPO_API_URL="https://api.github.com/repos/${REPO}"
           VERSION_FILE="src/version.h"
           FILE_CONTENT=$(curl -sL "$REPO_URL/raw/main/$VERSION_FILE")
           MKTORRENT_VERSION=$(echo "$FILE_CONTENT" | grep '#define MKTORRENT_VERSION' | awk '{print $3}' | sed 's/"//g')
@@ -50,7 +52,7 @@ jobs:
           BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME" "$MKTORRENT_VERSION" "${{ env.CURRENT_MKTORRENT_PATH }}")
           FULL_VERSION="${MKTORRENT_VERSION}-1${BUILD_NUMBER}"
           PACKAGE_FILE="${PACKAGE_NAME}_${FULL_VERSION}_${ARCHITECTURE}.deb"
-          COMMIT_DATE=$(curl -s "$REPO_URL/branches/main" | jq -r '.commit.commit.committer.date')
+          COMMIT_DATE=$(curl -s "$REPO_API_URL/branches/main" | jq -r '.commit.commit.committer.date')
           COMMIT_TIMESTAMP=$(date -d "$COMMIT_DATE" +%s)
           CURRENT_TIMESTAMP=$(date +%s)
           TIMESTAMP_DIFF=$(( (CURRENT_TIMESTAMP - COMMIT_TIMESTAMP) / 3600 ))
