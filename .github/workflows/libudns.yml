@@ -77,7 +77,7 @@ jobs:
         id: libudns_download
         if: steps.determine_build.outputs.env_setup == 'true'
         env:
-          tmp_dir: ${{ steps.libudns_update.outputs.TMP_DIR }}
+          tmp_dir: ${{ steps.determine_build.outputs.tmp_dir }}
         run: |
           cd ${tmp_dir}
           sudo apt-get update
@@ -92,10 +92,10 @@ jobs:
         id: package_libudns
         if: steps.libudns_download.outputs.libudns_downloaded == 'true'
         env:
-          tmp_dir: ${{ steps.determine_build.outputs.TMP_DIR }}
+          tmp_dir: ${{ steps.determine_build.outputs.tmp_dir }}
           pool_path: ${{ env.POOL_PATH }}
-          full_version: ${{ steps.determine_build.outputs.FULL_VERSION }}
-          current_date: ${{ steps.determine_build.outputs.CURRENT_DATE }}
+          full_version: ${{ steps.determine_build.outputs.full_version }}
+          current_date: ${{ steps.determine_build.outputs.current_date }}
           scripts_path: ${{ env.SCRIPTS_PATH }}
         run: |
           set -e
@@ -121,9 +121,10 @@ jobs:
         run: |
           set -e
           cd ${pool_path}
-          for package in libudns*.deb; do
-            checksum=$(sha256sum "$package" | awk '{ print $1 }')
-            echo "${package}_checksum=${checksum}" >> $GITHUB_OUTPUT
+          for package_file in libudns*.deb; do
+            checksum=$(sha256sum "$package_file" | awk '{ print $1 }')
+            package_name=$(basename "$package_file" | sed 's/_.*//')
+            echo "${package_name}_checksum=${checksum}" >> $GITHUB_OUTPUT
           done
           echo "checksum_generated=true" >> $GITHUB_OUTPUT
 
@@ -156,8 +157,8 @@ jobs:
         uses: EndBug/add-and-commit@v9
         env:
           commit_message: ${{ steps.determine_build.outputs.commit_message }}
-          author_email: "${{ secrets.COMMITER_EMAIL }}"
-          author_name: "${{ secrets.COMMITER_NAME }}"
+          author_email: "${{ secrets.COMMITTER_EMAIL }}"
+          author_name: "${{ secrets.COMMITTER_NAME }}"
         with:
           author_name: "${{ env.author_name }}"
           author_email: "${{ env.author_email }}"
@@ -171,7 +172,7 @@ jobs:
           pull: "--rebase --autostash"
 
       - name: Trigger Update Manifest Workflow
-        if: steps.validate_update.outputs.update_needed == 'true'
+        if: steps.archive_packages.outputs.archive_processed == 'true'
         uses: peter-evans/repository-dispatch@v3
         with:
           event-type: update-manifest
@@ -180,15 +181,15 @@ jobs:
               "package_updates": {
                 "libudns0": {
                   "checksum": "${{ steps.generate_checksums.outputs.libudns0_checksum }}",
-                  "version": "${{ steps.libudns_update.outputs.FULL_VERSION }}",
+                  "version": "${{ steps.determine_build.outputs.full_version }}",
                   "category": "libudns",
-                  "build_date": "${{ steps.libudns_update.outputs.CURRENT_DATE }}"
+                  "build_date": "${{ steps.determine_build.outputs.current_date }}"
                 },
                 "libudns-dev": {
-                  "checksum": "${{ steps.generate_checksums.outputs.libudns-dev_checksum }}",
-                  "version": "${{ steps.libudns_update.outputs.FULL_VERSION }}",
+                  "checksum": "${{ steps.generate_checksums.outputs.libudns_dev_checksum }}",
+                  "version": "${{ steps.determine_build.outputs.full_version }}",
                   "category": "libudns",
-                  "build_date": "${{ steps.libudns_update.outputs.CURRENT_DATE }}"
+                  "build_date": "${{ steps.determine_build.outputs.current_date }}"
                 }
               }
             }
