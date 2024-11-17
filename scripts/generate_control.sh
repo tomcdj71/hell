@@ -65,7 +65,7 @@ sudo chown -R "$USERNAME:$USERNAME" "$PACKAGE_DIR"
 
 control_file="$PACKAGE_DIR/DEBIAN/control"
 COPYRIGHT=" .
-   Packaged by MediaEase on $CURRENT_DATE."
+  Packaged by MediaEase on $CURRENT_DATE."
 echo "$COPYRIGHT" >> "$control_file"
 
 # Modify the 'Depends' field to lock to current version
@@ -77,8 +77,30 @@ elif [ "$PACKAGE_NAME" == "python3-libtorrent" ]; then
   sed -i "s/^\(Depends:.*libtorrent-rasterbar2.*(>=\s*\)[^)]*\()\)/\1$FULL_VERSION\2/" "$control_file"
 fi
 
-echo "Contents of $control_file after modification:"
+# Reordering the Description field in the control file
+echo "Reordering Description field in \"$control_file\""
+desc_file="${control_file}.description"
+tmp_file="${control_file}.tmp"
+awk -v desc_file="$desc_file" -v tmp_file="$tmp_file" '
+BEGIN { in_desc=0 }
+# Start capturing Description
+/^Description:/ { in_desc=1; print > desc_file; next }
+# Stop capturing Description at the next non-indented line
+/^[^ ]/ { if (in_desc==1) { in_desc=0 } }
+# Write to the description file if in_desc is active
+in_desc==1 { print > desc_file }
+# Write everything else to the temp file
+in_desc==0 { print > tmp_file }
+' "$control_file"
+
+# Overwrite the control file with reordered content
+mv "$tmp_file" "$control_file"
+cat "$desc_file" >> "$control_file"
+rm -f "$desc_file"
+
+echo "Contents of \"$control_file\" after modification:"
 cat "$control_file"
+
 
 # Extract package contents
 echo "Extracting package contents to $PACKAGE_DIR"
