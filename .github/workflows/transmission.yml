@@ -10,7 +10,7 @@ on:
       - '.github/workflows/transmission.yml'
 
 jobs:
-  build_transmission:
+  transmission:
     runs-on: ubuntu-24.04
 
     strategy:
@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: tecolicom/actions-use-apt-tools@v1
         with:
-          tools: build-essential cmake pkg-config libcurl4-openssl-dev libssl-dev libevent-dev libminiupnpc-dev libsystemd-dev zlib1g-dev libnatpmp-dev intltool autoconf automake libtool unzip zip jq
+          tools: build-essential cmake pkg-config libcurl4-openssl-dev libssl-dev libevent-dev clang-tidy libminiupnpc-dev libsystemd-dev zlib1g-dev libnatpmp-dev intltool autoconf automake libtool unzip zip jq
           cache: false
 
       - name: Checkout Repository
@@ -70,6 +70,7 @@ jobs:
           # Checkout Transmission repository
           git clone --depth 1 --branch "$REF" "$REPO_URL" ${{ github.workspace }}/Transmission
           cd ${{ github.workspace }}/Transmission
+          git submodule update --init --recursive
           LATEST_COMMIT_SHA=$(git rev-parse HEAD)
           COMMIT_DATE=$(git show -s --format=%ci "${LATEST_COMMIT_SHA}")
           if [ -z "$COMMIT_DATE" ]; then
@@ -120,6 +121,7 @@ jobs:
           done
 
       - name: Compile and Install Transmission
+        id: transmission_build
         if: steps.transmission_update.outputs.update_needed == 'true'
         env:
           install_dir: ${{ steps.transmission_update.outputs.INSTALL_DIR }}
@@ -127,23 +129,25 @@ jobs:
           set -e
           cd ${{ github.workspace }}/Transmission
           mkdir -p build
-          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DENABLE_DAEMON=ON \
             -DENABLE_GTK=OFF \
             -DENABLE_QT=OFF \
             -DENABLE_UTILS=ON \
             -DENABLE_CLI=ON \
             -DENABLE_TESTS=OFF \
-            -DINSTALL_LIB=ON \
             -DCMAKE_INSTALL_PREFIX="/usr" \
-            -DRUN_CLANG_TIDY=OFF
+            -DCMAKE_C_STANDARD_INCLUDE_DIRECTORIES=/usr/local/include \
+            -DCMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES=/usr/local/include \
+            -DRUN_CLANG_TIDY=ON
           cmake --build build --parallel $(nproc)
           DESTDIR="${install_dir}" cmake --install build
           echo "transmission_compiled=true" >> $GITHUB_OUTPUT
 
       - name: Generate Deb Files for Transmission
         id: generate_deb_files
-        if: steps.transmission_update.outputs.transmission_compiled == 'true'
+        if: steps.transmission_build.outputs.transmission_compiled == 'true'
         env:
           base_version: ${{ steps.transmission_update.outputs.BASE_VERSION }}
           full_version: ${{ steps.transmission_update.outputs.FULL_VERSION }}
