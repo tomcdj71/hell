@@ -1,0 +1,273 @@
+name: Compile Transmission
+
+on:
+  schedule:
+    - cron: "0 15 */2 * *"
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/transmission.yml'
+
+jobs:
+  build_transmission:
+    runs-on: ubuntu-24.04
+
+    strategy:
+      max-parallel: 1
+      matrix:
+        build_type: [release, nightly]
+
+    env:
+      REPO_PATH: "${{ github.workspace }}/binaries"
+      CURRENT_TRANSMISSION_PATH: "${{ github.workspace }}/binaries/dist/current/transmission"
+      ARCHIVE_TRANSMISSION_PATH: "${{ github.workspace }}/binaries/dist/archive/transmission"
+      POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
+      SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
+      TIME_DIFF: 48000  # hours
+
+    steps:
+      - uses: tecolicom/actions-use-apt-tools@v1
+        with:
+          tools: build-essential cmake pkg-config libcurl4-openssl-dev libssl-dev libevent-dev libminiupnpc-dev libsystemd-dev zlib1g-dev libnatpmp-dev intltool autoconf automake libtool unzip zip jq
+          cache: false
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ env.REPO_PATH }}
+
+      - name: Determine Transmission Version and Updates
+        id: transmission_update
+        env:
+          build_type: ${{ matrix.build_type }}
+          time_diff: ${{ env.TIME_DIFF }}
+        run: |
+          set -e
+          CURRENT_TIME=$(date +%s)
+          BUILD_TYPE="${build_type}"
+          if [ "$BUILD_TYPE" == "release" ]; then
+            LATEST_TAG=$(curl -s https://api.github.com/repos/transmission/transmission/releases/latest | jq -r .tag_name)
+            if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" == "null" ]; then
+              echo "Failed to get the latest release tag."
+              echo "update_needed=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            TRANSMISSION_VERSION=${LATEST_TAG#v}
+            PACKAGE_SUFFIX=""
+            REPO_URL="https://github.com/transmission/transmission"
+            REF="$LATEST_TAG"
+          elif [ "$BUILD_TYPE" == "nightly" ]; then
+            PACKAGE_SUFFIX="-nightly"
+            TRANSMISSION_VERSION="nightly"
+            REPO_URL="https://github.com/transmission/transmission"
+            REF="master"
+          else
+            echo "Invalid build type: $BUILD_TYPE"
+            exit 1
+          fi
+          # Checkout Transmission repository
+          git clone --depth 1 --branch "$REF" "$REPO_URL" ${{ github.workspace }}/Transmission
+          cd ${{ github.workspace }}/Transmission
+          LATEST_COMMIT_SHA=$(git rev-parse HEAD)
+          COMMIT_DATE=$(git show -s --format=%ci "${LATEST_COMMIT_SHA}")
+          if [ -z "$COMMIT_DATE" ]; then
+            echo "Warning: Unable to fetch the latest commit date for SHA '${LATEST_COMMIT_SHA}'. Assuming no updates."
+            echo "UPDATE_NEEDED=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          COMMIT_EPOCH=$(date -d "$COMMIT_DATE" +%s)
+          TIME_DIFF_HOURS=$(( (CURRENT_TIME - COMMIT_EPOCH) / 3600 ))
+          echo "Latest commit was $TIME_DIFF_HOURS hours ago."
+          if (( TIME_DIFF_HOURS <= ${time_diff} )); then
+            UPDATE_NEEDED=true
+            echo "Recent commit detected. Proceeding with build."
+          else
+            UPDATE_NEEDED=false
+            echo "No recent commits in the last ${time_diff} hours. Skipping build."
+            echo "UPDATE_NEEDED=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [ "$BUILD_TYPE" == "release" ]; then
+            BASE_VERSION="$TRANSMISSION_VERSION"
+          else
+            MAJOR_VERSION=$(grep -Eo 'set\(TR_VERSION_MAJOR "[^"]*"\)' CMakeLists.txt | sed -E 's/.*"([0-9]+)".*/\1/')
+            MINOR_VERSION=$(grep -Eo 'set\(TR_VERSION_MINOR "[^"]*"\)' CMakeLists.txt | sed -E 's/.*"([0-9]+)".*/\1/')
+            PATCH_VERSION=$(grep -Eo 'set\(TR_VERSION_PATCH "[^"]*"\)' CMakeLists.txt | sed -E 's/.*"([0-9]+)".*/\1/')
+            BASE_VERSION="${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}"
+            BUILD_METADATA="~git${LATEST_COMMIT_SHA:0:7}"
+          fi
+          PACKAGE_NAME="transmission"
+          ARCHITECTURE="amd64"
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME${PACKAGE_SUFFIX}" "$BASE_VERSION" "${{ env.CURRENT_TRANSMISSION_PATH }}")
+          FULL_VERSION="${BASE_VERSION}-1${BUILD_NUMBER}"
+          COMMIT_MESSAGE="Update Transmission${PACKAGE_SUFFIX} to v${BASE_VERSION} [automated]"
+          TMP_DIR=$(mktemp -d)
+          TMP_DIR=${TMP_DIR##*tmp.}
+          TMP_DIR="${{ env.REPO_PATH }}/$TMP_DIR"
+          mkdir -p $TMP_DIR
+          INSTALL_DIR="${{ env.REPO_PATH }}/install"
+          variables=(UPDATE_NEEDED TMP_DIR INSTALL_DIR PACKAGE_NAME BASE_VERSION FULL_VERSION BUILD_NUMBER COMMIT_MESSAGE CURRENT_DATE BUILD_TYPE PACKAGE_SUFFIX LATEST_COMMIT_SHA)
+          variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
+          for variable in "${variables_sorted[@]}"; do
+            lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
+            upper_variable=$(echo "$variable" | tr '[:lower:]' '[:upper:]')
+            value="${!variable}"
+            echo "${upper_variable} : ${value}"
+            echo "${lower_variable}=${value}" >> $GITHUB_OUTPUT
+          done
+
+      - name: Compile and Install Transmission
+        if: steps.transmission_update.outputs.update_needed == 'true'
+        env:
+          install_dir: ${{ steps.transmission_update.outputs.INSTALL_DIR }}
+        run: |
+          set -e
+          cd ${{ github.workspace }}/Transmission
+          mkdir -p build
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_DAEMON=ON \
+            -DENABLE_GTK=OFF \
+            -DENABLE_QT=OFF \
+            -DENABLE_UTILS=ON \
+            -DENABLE_CLI=ON \
+            -DENABLE_TESTS=OFF \
+            -DINSTALL_LIB=ON \
+            -DCMAKE_INSTALL_PREFIX="/usr" \
+            -DRUN_CLANG_TIDY=OFF
+          cmake --build build --parallel $(nproc)
+          DESTDIR="${install_dir}" cmake --install build
+          echo "transmission_compiled=true" >> $GITHUB_OUTPUT
+
+      - name: Generate Deb Files for Transmission
+        id: generate_deb_files
+        if: steps.transmission_update.outputs.transmission_compiled == 'true'
+        env:
+          base_version: ${{ steps.transmission_update.outputs.BASE_VERSION }}
+          full_version: ${{ steps.transmission_update.outputs.FULL_VERSION }}
+          package_suffix: ${{ steps.transmission_update.outputs.PACKAGE_SUFFIX }}
+          current_date: ${{ steps.transmission_update.outputs.CURRENT_DATE }}
+          install_dir: ${{ steps.transmission_update.outputs.INSTALL_DIR }}
+          tmp_dir: ${{ steps.transmission_update.outputs.TMP_DIR }}
+          pool_path: ${{ env.POOL_PATH }}
+          scripts_path: ${{ env.SCRIPTS_PATH }}
+        run: |
+          set -e
+          # Prepare package names
+          PACKAGE_NAMES=("transmission-common" "transmission-cli")
+          for PACKAGE in "${PACKAGE_NAMES[@]}"; do
+            PACKAGE_NAME="${PACKAGE}"
+            PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
+            cd "${tmp_dir}"
+            sudo apt-get update
+            apt-get download "${PACKAGE_NAME}"
+            bash "${scripts_path}/generate_control.sh" \
+              "${PACKAGE_NAME}" \
+              "${install_dir}" \
+              "${tmp_dir}" \
+              "${full_version}" \
+              "${current_date}" \
+              "${pool_path}"
+            # Rename the package file to include the PACKAGE_SUFFIX
+            ORIGINAL_PACKAGE_FILE="${PACKAGE_NAME}_${full_version}_amd64.deb"
+            NEW_PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_amd64.deb"
+            mv "${pool_path}/${ORIGINAL_PACKAGE_FILE}" "${pool_path}/${NEW_PACKAGE_FILE}"
+            CHECKSUM=$(sha256sum "${pool_path}/${NEW_PACKAGE_FILE}" | awk '{ print $1 }')
+            package_var=$(echo "${PACKAGE_NAME}" | sed 's/[-.]/_/g')
+            echo "${package_var}_checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
+            package_file_var=$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g')
+            echo "${package_file_var}_file=${NEW_PACKAGE_FILE}" >> $GITHUB_OUTPUT
+          done
+          echo "transmission_packaged=true" >> $GITHUB_OUTPUT
+
+      - name: Archive and Upload Transmission Packages
+        id: archive_and_upload
+        if: steps.generate_deb_files.outputs.transmission_packaged == 'true'
+        env:
+          full_version: ${{ steps.transmission_update.outputs.FULL_VERSION }}
+          package_names: |
+            transmission-common
+            transmission-cli
+          package_suffix: ${{ steps.transmission_update.outputs.PACKAGE_SUFFIX }}
+          pool_path: ${{ env.POOL_PATH }}
+          current_transmission_path: ${{ env.CURRENT_TRANSMISSION_PATH }}
+          archive_transmission_path: ${{ env.ARCHIVE_TRANSMISSION_PATH }}
+          scripts_path: ${{ env.SCRIPTS_PATH }}
+        run: |
+          set -e
+          for PACKAGE in $package_names; do
+            PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
+            PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_amd64.deb"
+            if [ -f "${pool_path}/${PACKAGE_FILE}" ]; then
+              bash "${scripts_path}/archive_packages.sh" \
+                "${current_transmission_path}" \
+                "${archive_transmission_path}" \
+                "${pool_path}/${PACKAGE_FILE}"
+            else
+              echo "Package ${PACKAGE_FILE} not found in ${pool_path}"
+            fi
+          done
+          echo "archive_processed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and Push Transmission Packages
+        if: steps.archive_and_upload.outputs.archive_processed == 'true'
+        uses: EndBug/add-and-commit@v9
+        env:
+          commit_message: ${{ steps.transmission_update.outputs.COMMIT_MESSAGE }}
+          author_name: "tomcdj71"
+          author_email: "contact.tomc@yahoo.fr"
+        with:
+          author_name: "${{ env.author_name }}"
+          author_email: "${{ env.author_email }}"
+          default_author: user_info
+          message: ${{ env.commit_message }}
+          cwd: "./binaries"
+          add: |
+            dist/current/transmission/
+            dist/archive/transmission/
+          push: true
+          pull: "--rebase --autostash"
+
+      - name: Trigger Update Manifest Workflow
+        if: steps.archive_and_upload.outputs.archive_processed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        env:
+          full_version: ${{ steps.transmission_update.outputs.FULL_VERSION }}
+          current_date: ${{ steps.transmission_update.outputs.CURRENT_DATE }}
+          transmission_common_checksum: ${{ steps.generate_deb_files.outputs.transmission_common_checksum }}
+          transmission_cli_checksum: ${{ steps.generate_deb_files.outputs.transmission_cli_checksum }}
+        with:
+          event-type: update-manifest
+          client-payload: |
+            {
+              "package_updates": {
+                "transmission-common": {
+                  "checksum": "${{ env.transmission_common_checksum }}",
+                  "version": "${{ env.full_version }}",
+                  "category": "transmission",
+                  "build_date": "${{ env.current_date }}"
+                },
+                "transmission-cli": {
+                  "checksum": "${{ env.transmission_cli_checksum }}",
+                  "version": "${{ env.full_version }}",
+                  "category": "transmission",
+                  "build_date": "${{ env.current_date }}"
+                }
+              }
+            }
+
+      - name: Trigger Create Release Workflow
+        if: steps.archive_and_upload.outputs.archive_processed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        env:
+          package_name: "transmission${{ steps.transmission_update.outputs.PACKAGE_SUFFIX }}"
+          package_version: ${{ steps.transmission_update.outputs.FULL_VERSION }}
+        with:
+          event-type: create-release
+          client-payload: |
+            {
+              "package_name": "${{ env.package_name }}",
+              "package_version": "${{ env.package_version }}"
+            }

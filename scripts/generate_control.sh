@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# generate_control.sh - Script to generate control file for a Debian package
 set -e
 
 # Parse options
