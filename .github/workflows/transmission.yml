@@ -144,6 +144,7 @@ jobs:
             -DRUN_CLANG_TIDY=OFF
           cmake --build build --parallel $(nproc)
           DESTDIR="${install_dir}" cmake --install build
+          find "${install_dir}" -type f -executable -exec strip --strip-unneeded {} + || true
           echo "transmission_compiled=true" >> $GITHUB_OUTPUT
 
       - name: Generate Deb Files for Transmission
