@@ -85,6 +85,7 @@ jobs:
           for package in "${packages[@]}"; do
             apt-get download $package
           done
+          tree -L 2 ${tmp_dir}
           echo "libudns_downloaded=true" >> $GITHUB_OUTPUT
 
       - name: Generate Control Files and Repackage

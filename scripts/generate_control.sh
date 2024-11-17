@@ -41,7 +41,7 @@ echo "=================="
 
 # Find the correct package file
 echo "Attempting to find package file matching: ${PACKAGE_NAME}"
-PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}_*" -print -quit)
+PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}*" -print -quit)
 
 if [ -z "$PACKAGE_FILE" ]; then
   echo "Error: Package file for $PACKAGE_NAME not found in $TMPDIR"
