@@ -64,7 +64,7 @@ jobs:
             PACKAGE_SUFFIX="-nightly"
             TRANSMISSION_VERSION="nightly"
             REPO_URL="https://github.com/transmission/transmission"
-            REF="master"
+            REF="main"
           else
             echo "Invalid build type: $BUILD_TYPE"
             exit 1
@@ -132,7 +132,7 @@ jobs:
           cd ${{ github.workspace }}/Transmission
           mkdir -p build
           cmake -B build \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_BUILD_TYPE=Release \
             -DENABLE_DAEMON=ON \
             -DENABLE_GTK=OFF \
             -DENABLE_QT=OFF \
