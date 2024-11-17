@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
 set -e
+
+# Parse options
+NO_CHECK=false
+for arg in "$@"; do
+  case $arg in
+    --no-check)
+      NO_CHECK=true
+      shift
+      ;;
+    *)
+      ;;
+  esac
+done
+
+# Script arguments
 PACKAGE_NAME="$1"
 INSTALL_DIR="$2"
 TMPDIR="$3"
@@ -21,6 +36,7 @@ echo "FULL_VERSION: $FULL_VERSION"
 echo "CURRENT_DATE: $CURRENT_DATE"
 echo "POOL_PATH: $POOL_PATH"
 echo "PACKAGE_DIR: $PACKAGE_DIR"
+echo "NO_CHECK: $NO_CHECK"
 echo "=================="
 
 # Find the correct package file
@@ -70,22 +86,26 @@ sudo dpkg -x "$TMPDIR/$PACKAGE_FILE" "$PACKAGE_DIR" || {
   exit 1
 }
 
+if [ "$NO_CHECK" == true ]; then
+  rm -f "$TMPDIR/$PACKAGE_FILE"
+fi
+
 sudo chown -R "$USERNAME:$USERNAME" "$PACKAGE_DIR"
 
 cd "$PACKAGE_DIR"
 
-# Update installed size
-control_file="DEBIAN/control"
-old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
-rsync -auv --existing "$INSTALL_DIR/" "./"
-installed_size=$(du -sk . | cut -f1)
-echo "Old Installed-Size: $old_installed_size kB"
-echo "New Installed-Size: $installed_size kB"
-sed -i "s/^Installed-Size: .*/Installed-Size: $installed_size/" "$control_file"
-
-# Generate md5sums for the package
-rm -f DEBIAN/md5sums
-find . -type f ! -path './DEBIAN/*' -exec md5sum {} \; > DEBIAN/md5sums
+if [ "$NO_CHECK" = false ]; then
+  control_file="DEBIAN/control"
+  old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
+  echo "Performing rsync to merge installation files..."
+  rsync -auv --existing "$INSTALL_DIR/" "./"
+  installed_size=$(du -sk . | cut -f1)
+  echo "Old Installed-Size: $old_installed_size kB"
+  echo "New Installed-Size: $installed_size kB"
+  sed -i "s/^Installed-Size: .*/Installed-Size: $installed_size/" "$control_file"
+  rm -f DEBIAN/md5sums
+  find . -type f ! -path './DEBIAN/*' -exec md5sum {} \; > DEBIAN/md5sums
+fi
 
 cd - > /dev/null
 
@@ -118,4 +138,3 @@ echo "Checksum written to $TMPDIR/checksums/${PACKAGE_NAME}.sha256"
 echo "Checksum for $PACKAGE_NAME: $PACKAGE_NAME_CHECKSUM"
 echo "Completed processing and packaging for $PACKAGE_NAME"
 export PACKAGE_NAME_CHECKSUM
-

@@ -1,0 +1,185 @@
+name: Compile libudns
+
+permissions: write-all
+
+on:
+  schedule:
+    - cron: "0 0 1 1,7 *"
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/libudns.yml'
+
+jobs:
+  compile_libudns:
+    runs-on: ubuntu-latest
+
+    env:
+      REPO_PATH: "${{ github.workspace }}/binaries"
+      CURRENT_LIBUDNS_PATH: "${{ github.workspace }}/binaries/dist/current/libudns"
+      ARCHIVE_LIBUDNS_PATH: "${{ github.workspace }}/binaries/dist/archive/libudns"
+      POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
+      SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
+      LIBUDNS_PATH: "${{ github.workspace }}/libudns"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ env.REPO_PATH }}
+
+      - name: Validate Update
+        id: validate_update
+        run: |
+          if ls "${{ env.CURRENT_LIBUDNS_PATH }}/libudns*.deb" 1> /dev/null 2>&1; then
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: tecolicom/actions-use-apt-tools@v1
+        with:
+          tools: build-essential automake libtool curl git autoconf-archive bc checkinstall dos2unix dstat fontconfig autotools-dev pkg-config cmake
+          cache: false
+
+      - name: Determine libudns Version and Updates
+        if: steps.validate_update.outputs.update_needed == 'true'
+        id: determine_build
+        env:
+          time_diff: 48000
+        run: |
+          set -e
+          VERSION="0.4.1"
+          PACKAGE_NAME="libudns"
+          ARCHITECTURE="amd64"
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME" "$VERSION" "${{ env.CURRENT_LIBUDNS_PATH }}")
+          FULL_VERSION="${VERSION}-1${BUILD_NUMBER}"
+          COMMIT_MESSAGE="Update libudns to v${VERSION}"
+          TMP_DIR=$(mktemp -d)
+          TMP_DIR=${TMP_DIR##*tmp.}
+          TMP_DIR="${{ env.REPO_PATH }}/$TMP_DIR"
+          mkdir -p $TMP_DIR
+          variables=(FULL_VERSION CURRENT_DATE TMP_DIR BUILD_NUMBER VERSION PACKAGE_NAME ARCHITECTURE)
+          variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
+          for variable in "${variables_sorted[@]}"; do
+            lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
+            upper_variable=$(echo "$variable" | tr '[:lower:]' '[:upper:]')
+            value="${!upper_variable}"
+            echo "${upper_variable} : ${value}"
+            echo "${lower_variable}=${value}" >> $GITHUB_OUTPUT
+          done
+
+      - name: Download Official libudns Packages
+        if: steps.validate_update.outputs.update_needed == 'true'
+        env:
+          tmp_dir: ${{ steps.libudns_update.outputs.TMP_DIR }}
+        run: |
+          cd ${tmp_dir}
+          sudo apt-get update
+          packages=(libudns0 libudns-dev)
+          for package in "${packages[@]}"; do
+            apt-get download $package
+          done
+
+      - name: Generate Control Files and Repackage
+        if: steps.validate_update.outputs.update_needed == 'true'
+        env:
+          tmp_dir: ${{ steps.libudns_update.outputs.TMP_DIR }}
+          pool_path: ${{ env.POOL_PATH }}
+          full_version: ${{ steps.libudns_update.outputs.FULL_VERSION }}
+          current_date: ${{ steps.libudns_update.outputs.CURRENT_DATE }}
+          scripts_path: ${{ env.SCRIPTS_PATH }}
+        run: |
+          set -e
+          mkdir -p "${pool_path}"
+          packages=(libudns0 libudns-dev)
+          for package in "${packages[@]}"; do
+            bash "${scripts_path}/generate_control.sh" \
+              --no-check \
+              "${package}" \
+              "${tmp_dir}" \
+              "${tmp_dir}" \
+              "${full_version}" \
+              "${current_date}" \
+              "${pool_path}" 
+          done
+
+      - name: Generate Checksums
+        if: steps.validate_update.outputs.update_needed == 'true'
+        env:
+          pool_path: ${{ env.POOL_PATH }}
+        run: |
+          set -e
+          cd ${pool_path}
+          for package in libudns*.deb; do
+            checksum=$(sha256sum "$package" | awk '{ print $1 }')
+            echo "${package}_checksum=${checksum}" >> $GITHUB_OUTPUT
+          done
+          echo "libudns_packaged=true" >> $GITHUB_OUTPUT
+
+      - name: Archive and Upload Packages
+        if: steps.validate_update.outputs.update_needed == 'true'
+        env:
+          current_libudns_path: ${{ env.CURRENT_LIBUDNS_PATH }}
+          archive_libudns_path: ${{ env.ARCHIVE_LIBUDNS_PATH }}
+          pool_path: ${{ env.POOL_PATH }}
+          scripts_path: ${{ env.SCRIPTS_PATH }}
+        run: |
+          set -e
+          for package in libudns0 libudns-dev; do
+            echo "Archiving package: ${package}"
+            package_file=$(find "${pool_path}" -type f -name "${package}_*_amd64.deb" -print -quit)
+            if [ -z "$package_file" ]; then
+              echo "Error: No package file found for ${package} in ${pool_path}"
+              exit 1
+            fi
+            bash "${scripts_path}/archive_packages.sh" \
+              "${current_libudns_path}" \
+              "${archive_libudns_path}" \
+              "${package_file}"
+          done
+
+      - name: Commit and Push Package
+        if: steps.archive_packages.outputs.archive_processed == 'true'
+        uses: EndBug/add-and-commit@v9
+        env:
+          commit_message: ${{ steps.determine_build.outputs.commit_message }}
+          author_email: "${{ secrets.COMMITER_EMAIL }}"
+          author_name: "${{ secrets.COMMITER_NAME }}"
+        with:
+          author_name: "${{ env.author_name }}"
+          author_email: "${{ env.author_email }}"
+          default_author: user_info
+          message: ${{ env.commit_message }}
+          cwd: "./binaries"
+          add: |
+            dist/current/
+            dist/archive/
+          push: true
+          pull: "--rebase --autostash"
+
+      - name: Trigger Update Manifest Workflow
+        if: steps.validate_update.outputs.update_needed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: update-manifest
+          client-payload: |
+            {
+              "package_updates": {
+                "libudns0": {
+                  "checksum": "${{ steps.generate_checksums.outputs.libudns0_checksum }}",
+                  "version": "${{ steps.libudns_update.outputs.FULL_VERSION }}",
+                  "category": "libudns",
+                  "build_date": "${{ steps.libudns_update.outputs.CURRENT_DATE }}"
+                },
+                "libudns-dev": {
+                  "checksum": "${{ steps.generate_checksums.outputs.libudns-dev_checksum }}",
+                  "version": "${{ steps.libudns_update.outputs.FULL_VERSION }}",
+                  "category": "libudns",
+                  "build_date": "${{ steps.libudns_update.outputs.CURRENT_DATE }}"
+                }
+              }
+            }
