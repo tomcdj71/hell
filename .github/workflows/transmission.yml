@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: tecolicom/actions-use-apt-tools@v1
         with:
-          tools: build-essential cmake pkg-config libcurl4-openssl-dev libssl-dev libevent-dev libminiupnpc-dev libsystemd-dev zlib1g-dev libnatpmp-dev intltool autoconf automake libtool unzip zip jq
+          tools: build-essential cmake pkg-config libcurl4-openssl-dev libpsl5 psl libpsl-dev dhtnode libssl-dev libevent-dev libminiupnpc-dev libsystemd-dev zlib1g-dev libnatpmp-dev intltool autoconf automake libtool unzip zip jq
           cache: false
 
       - name: Checkout Repository
