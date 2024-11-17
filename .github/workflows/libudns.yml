@@ -62,7 +62,7 @@ jobs:
           TMP_DIR=${TMP_DIR##*tmp.}
           TMP_DIR="${{ env.REPO_PATH }}/$TMP_DIR"
           mkdir -p $TMP_DIR
-          variables=(FULL_VERSION CURRENT_DATE TMP_DIR BUILD_NUMBER VERSION PACKAGE_NAME ARCHITECTURE)
+          variables=(FULL_VERSION CURRENT_DATE TMP_DIR BUILD_NUMBER VERSION PACKAGE_NAME ARCHITECTURE COMMIT_MESSAGE)
           variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
           for variable in "${variables_sorted[@]}"; do
             lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
@@ -71,9 +71,11 @@ jobs:
             echo "${upper_variable} : ${value}"
             echo "${lower_variable}=${value}" >> $GITHUB_OUTPUT
           done
+          echo "env_setup=true" >> $GITHUB_OUTPUT
 
       - name: Download Official libudns Packages
-        if: steps.validate_update.outputs.update_needed == 'true'
+        id: libudns_download
+        if: steps.determine_build.outputs.env_setup == 'true'
         env:
           tmp_dir: ${{ steps.libudns_update.outputs.TMP_DIR }}
         run: |
@@ -83,9 +85,11 @@ jobs:
           for package in "${packages[@]}"; do
             apt-get download $package
           done
+          echo "libudns_downloaded=true" >> $GITHUB_OUTPUT
 
       - name: Generate Control Files and Repackage
-        if: steps.validate_update.outputs.update_needed == 'true'
+        id: package_libudns
+        if: steps.libudns_download.outputs.libudns_downloaded == 'true'
         env:
           tmp_dir: ${{ steps.libudns_update.outputs.TMP_DIR }}
           pool_path: ${{ env.POOL_PATH }}
@@ -106,9 +110,11 @@ jobs:
               "${current_date}" \
               "${pool_path}" 
           done
+          echo "libudns_packaged=true" >> $GITHUB_OUTPUT
 
       - name: Generate Checksums
-        if: steps.validate_update.outputs.update_needed == 'true'
+        id: generate_checksums
+        if: steps.package_libudns.outputs.libudns_packaged == 'true'
         env:
           pool_path: ${{ env.POOL_PATH }}
         run: |
@@ -118,10 +124,11 @@ jobs:
             checksum=$(sha256sum "$package" | awk '{ print $1 }')
             echo "${package}_checksum=${checksum}" >> $GITHUB_OUTPUT
           done
-          echo "libudns_packaged=true" >> $GITHUB_OUTPUT
+          echo "checksum_generated=true" >> $GITHUB_OUTPUT
 
       - name: Archive and Upload Packages
-        if: steps.validate_update.outputs.update_needed == 'true'
+        id: archive_packages
+        if: steps.generate_checksums.outputs.checksum_generated == 'true'
         env:
           current_libudns_path: ${{ env.CURRENT_LIBUDNS_PATH }}
           archive_libudns_path: ${{ env.ARCHIVE_LIBUDNS_PATH }}
@@ -141,6 +148,7 @@ jobs:
               "${archive_libudns_path}" \
               "${package_file}"
           done
+          echo "archive_processed=true" >> $GITHUB_OUTPUT
 
       - name: Commit and Push Package
         if: steps.archive_packages.outputs.archive_processed == 'true'
