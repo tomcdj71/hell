@@ -1,5 +1,7 @@
 name: Compile Transmission
 
+permissions: write-all
+
 on:
   schedule:
     - cron: "0 15 */2 * *"
@@ -29,7 +31,7 @@ jobs:
     steps:
       - uses: tecolicom/actions-use-apt-tools@v1
         with:
-          tools: build-essential cmake pkg-config libcurl4-openssl-dev libssl-dev libevent-dev clang-tidy libminiupnpc-dev libsystemd-dev zlib1g-dev libnatpmp-dev intltool autoconf automake libtool unzip zip jq
+          tools: build-essential cmake pkg-config libcurl4-openssl-dev libssl-dev libevent-dev libminiupnpc-dev libsystemd-dev zlib1g-dev libnatpmp-dev intltool autoconf automake libtool unzip zip jq
           cache: false
 
       - name: Checkout Repository
@@ -51,7 +53,7 @@ jobs:
             LATEST_TAG=$(curl -s https://api.github.com/repos/transmission/transmission/releases/latest | jq -r .tag_name)
             if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" == "null" ]; then
               echo "Failed to get the latest release tag."
-              echo "update_needed=false" >> $GITHUB_OUTPUT
+              echo "UPDATE_NEEDED=false" >> $GITHUB_OUTPUT
               exit 0
             fi
             TRANSMISSION_VERSION=${LATEST_TAG#v}
@@ -67,10 +69,10 @@ jobs:
             echo "Invalid build type: $BUILD_TYPE"
             exit 1
           fi
-          # Checkout Transmission repository
-          git clone --depth 1 --branch "$REF" "$REPO_URL" ${{ github.workspace }}/Transmission
+          # Checkout Transmission repository with submodules
+          git clone --depth 1 --branch "$REF" --recurse-submodules "$REPO_URL" ${{ github.workspace }}/Transmission
+          git -C ${{ github.workspace }}/Transmission submodule update --init --recursive
           cd ${{ github.workspace }}/Transmission
-          git submodule update --init --recursive
           LATEST_COMMIT_SHA=$(git rev-parse HEAD)
           COMMIT_DATE=$(git show -s --format=%ci "${LATEST_COMMIT_SHA}")
           if [ -z "$COMMIT_DATE" ]; then
@@ -137,10 +139,9 @@ jobs:
             -DENABLE_UTILS=ON \
             -DENABLE_CLI=ON \
             -DENABLE_TESTS=OFF \
+            -DINSTALL_LIB=ON \
             -DCMAKE_INSTALL_PREFIX="/usr" \
-            -DCMAKE_C_STANDARD_INCLUDE_DIRECTORIES=/usr/local/include \
-            -DCMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES=/usr/local/include \
-            -DRUN_CLANG_TIDY=ON
+            -DRUN_CLANG_TIDY=OFF
           cmake --build build --parallel $(nproc)
           DESTDIR="${install_dir}" cmake --install build
           echo "transmission_compiled=true" >> $GITHUB_OUTPUT
@@ -174,15 +175,15 @@ jobs:
               "${full_version}" \
               "${current_date}" \
               "${pool_path}"
-            # Rename the package file to include the PACKAGE_SUFFIX
             ORIGINAL_PACKAGE_FILE="${PACKAGE_NAME}_${full_version}_amd64.deb"
             NEW_PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_amd64.deb"
-            mv "${pool_path}/${ORIGINAL_PACKAGE_FILE}" "${pool_path}/${NEW_PACKAGE_FILE}"
+            if [ "${ORIGINAL_PACKAGE_FILE}" != "${NEW_PACKAGE_FILE}" ]; then
+              mv "${pool_path}/${ORIGINAL_PACKAGE_FILE}" "${pool_path}/${NEW_PACKAGE_FILE}"
+            fi
             CHECKSUM=$(sha256sum "${pool_path}/${NEW_PACKAGE_FILE}" | awk '{ print $1 }')
-            package_var=$(echo "${PACKAGE_NAME}" | sed 's/[-.]/_/g')
+            package_var=$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g' | sed 's/_nightly//')
             echo "${package_var}_checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
-            package_file_var=$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g')
-            echo "${package_file_var}_file=${NEW_PACKAGE_FILE}" >> $GITHUB_OUTPUT
+            echo "${package_var}_file=${NEW_PACKAGE_FILE}" >> $GITHUB_OUTPUT
           done
           echo "transmission_packaged=true" >> $GITHUB_OUTPUT
 
@@ -240,21 +241,20 @@ jobs:
         env:
           full_version: ${{ steps.transmission_update.outputs.FULL_VERSION }}
           current_date: ${{ steps.transmission_update.outputs.CURRENT_DATE }}
-          transmission_common_checksum: ${{ steps.generate_deb_files.outputs.transmission_common_checksum }}
-          transmission_cli_checksum: ${{ steps.generate_deb_files.outputs.transmission_cli_checksum }}
+          package_suffix: ${{ steps.transmission_update.outputs.PACKAGE_SUFFIX }}
         with:
           event-type: update-manifest
           client-payload: |
             {
               "package_updates": {
-                "transmission-common": {
-                  "checksum": "${{ env.transmission_common_checksum }}",
+                "transmission-common${{ env.package_suffix }}": {
+                  "checksum": "${{ steps.generate_deb_files.outputs.transmission_cli_checksum }}",
                   "version": "${{ env.full_version }}",
                   "category": "transmission",
                   "build_date": "${{ env.current_date }}"
                 },
-                "transmission-cli": {
-                  "checksum": "${{ env.transmission_cli_checksum }}",
+                "transmission-cli${{ env.package_suffix }}": {
+                  "checksum": "${{ steps.generate_deb_files.outputs.transmission_common_checksum }}",
                   "version": "${{ env.full_version }}",
                   "category": "transmission",
                   "build_date": "${{ env.current_date }}"

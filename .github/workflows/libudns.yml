@@ -12,7 +12,7 @@ on:
       - '.github/workflows/libudns.yml'
 
 jobs:
-  compile_libudns:
+  libudns:
     runs-on: ubuntu-latest
 
     env:

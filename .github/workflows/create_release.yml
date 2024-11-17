@@ -1,11 +1,13 @@
 name: Create Release
 
+permissions: write-all
+
 on:
   repository_dispatch:
     types: [create-release]
 
 jobs:
-  create_release:
+  release:
     runs-on: ubuntu-latest
 
     env:
@@ -136,8 +138,8 @@ jobs:
       - name: Commit and Push Release Archive
         uses: EndBug/add-and-commit@v9
         with:
-          author_name: "tomcdj71"
-          author_email: "contact.tomc@yahoo.fr"
+          author_email: "${{ secrets.COMMITTER_EMAIL }}"
+          author_name: "${{ secrets.COMMITTER_NAME }}"
           default_author: user_info
           message: "Update ${{ env.PACKAGE_NAME }} assets to v${{ env.PACKAGE_VERSION }} [automated]"
           cwd: "${{ env.RELEASE_ASSETS }}"
