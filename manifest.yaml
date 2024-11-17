@@ -127,14 +127,14 @@ packages:
     - bookworm
   transmission-cli-nightly:
     version: 4.1.0-1build1
-    checksum_sha256: a5c62d6bb4cbd2a2def81097db5f901a450436fc04c103e86312d8a06bf59103
+    checksum_sha256: 4fec57842c5fac221475396cd01ee6b9ada7194e06c5f7176cfd58db43ee67c2
     category: transmission
     build_date: '2024-11-17'
     distribution:
     - bookworm
   transmission-common-nightly:
     version: 4.1.0-1build1
-    checksum_sha256: 8a618ed8b0d1ebf37bc8f0d5c9c8a75414df1f25210e14725402aab5cd7c7274
+    checksum_sha256: 26cca3804fcf16f78d54ab558d5654d0b0f89a25b4ab19fe6e5d20aa6bb119f9
     category: transmission
     build_date: '2024-11-17'
     distribution:
