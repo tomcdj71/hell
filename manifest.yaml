@@ -148,16 +148,16 @@ packages:
     - bookworm
   transmission-cli-nightly:
     version: 4.1.0-1build1
-    checksum_sha256: 1d4c24de1b61bcc6437d985361ba627ac1f074c92e71b61ee859d5fd1ec2e650
+    checksum_sha256: a5c62d6bb4cbd2a2def81097db5f901a450436fc04c103e86312d8a06bf59103
     category: transmission
-    build_date: '2024-11-02'
+    build_date: '2024-11-17'
     distribution:
     - bookworm
   transmission-common-nightly:
     version: 4.1.0-1build1
-    checksum_sha256: d0a223e730b7917e0cce575b27ff822d9dab1cd4919b520c7cf7aaae97fc46cd
+    checksum_sha256: 8a618ed8b0d1ebf37bc8f0d5c9c8a75414df1f25210e14725402aab5cd7c7274
     category: transmission
-    build_date: '2024-11-02'
+    build_date: '2024-11-17'
     distribution:
     - bookworm
   libtorrent-rasterbar-dev:
