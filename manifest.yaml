@@ -62,20 +62,6 @@ packages:
     build_date: '2024-05-10'
     distribution:
     - bookworm
-  qbittorrent:
-    version: 4.6.7-1build1
-    checksum_sha256: 2eb8d5a4af51032c846081594de40507
-    category: qbittorrent
-    build_date: '2024-05-10'
-    distribution:
-    - bookworm
-  qbittorrent-nightly:
-    version: 5.00-1build1
-    checksum_sha256: 2eb8d5a4af51032c846081594de40507
-    category: qbittorrent
-    build_date: '2024-05-10'
-    distribution:
-    - bookworm
   rtorrent:
     version: 0.9.8-1build1
     checksum_sha256: 8aaea91aff3604451f7fda2540acce9d5d751831f31bc1e2d1fcffeffac0ce28
@@ -123,13 +109,6 @@ packages:
     checksum_sha256: 62c27285b2da9458fc78c80ed33172e91dfb4b9d43e52e6040b3121ec29adb8c
     category: libtorrent-rasterbar
     build_date: '2024-11-14'
-    distribution:
-    - bookworm
-  libtorrent-rasterbar10:
-    version: 1.2.19-1build1
-    checksum_sha256: b874d478fa49afd51dc0a9e576b00cca655813781912f7d48e53df4138c9d3cc
-    category: libtorrent-rasterbar
-    build_date: '2024-11-03'
     distribution:
     - bookworm
   transmission-cli:
@@ -217,10 +196,10 @@ applications:
   qbittorrent:
     dependencies:
     - libtorrent-rasterbar2.0t64
-    - python3-libtorrent-rasterbar2.0t64
-    - qbittorrent
+    - python3-libtorrent
+    - qbittorrent-nox
   qbittorrent-nightly:
     dependencies:
     - libtorrent-rasterbar2.0t64
-    - python3-libtorrent-rasterbar2.0t64
+    - python3-libtorrent
     - qbittorrent-nox-nightly
