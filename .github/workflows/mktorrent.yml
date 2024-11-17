@@ -112,7 +112,6 @@ jobs:
         run: |
           set -e
           cd ${{ github.workspace }}/mktorrent
-          mkdir -p build
           cmake_args=(
             -B build
             -G "Ninja"
@@ -137,12 +136,14 @@ jobs:
           current_date: ${{ steps.mktorrent_update.outputs.CURRENT_DATE }}
           pool_path: ${{ env.POOL_PATH }}
           scripts_path: ${{ env.SCRIPTS_PATH }}
+          tmp_dir: ${{ steps.mktorrent_update.outputs.TMP_DIR }}
         run: |
           set -e
-          mkdir -p "${POOL_PATH}"
+          mkdir -p "${pool_path}"
           bash "${scripts_path}/generate_control.sh" \
             "${package_name}" \
             "${install_dir}" \
+            "${tmp_dir}" \
             "${full_version}" \
             "${current_date}" \
             "${pool_path}"
