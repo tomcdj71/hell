@@ -142,7 +142,7 @@ jobs:
               echo "${package} not found. Exiting."
               exit 1
             }
-           done
+          done
 
       - name: Install xmlrpc-c
         if: steps.rtorrent_update.outputs.update_needed == 'true'
