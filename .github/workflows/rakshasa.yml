@@ -62,7 +62,7 @@ jobs:
           else
             echo "Invalid build type: $BUILD_TYPE"
             exit 1
-          fi 
+          fi
           REPO_URL="https://github.com/rakshasa/libtorrent"
           git clone --depth 1 --branch "$REF" "$REPO_URL" ${{ github.workspace }}/libtorrent-rakshasa
           cd ${{ github.workspace }}/libtorrent-rakshasa
