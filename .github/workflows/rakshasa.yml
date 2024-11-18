@@ -28,7 +28,7 @@ jobs:
       ARCHIVE_LIBTORRENT_PATH: "${{ github.workspace }}/binaries/dist/archive/libtorrent-rakshasa"
       POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
       SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
-      TIME_DIFF: 48  # hours
+      TIME_DIFF: 48000  # hours
 
     steps:
       - uses: tecolicom/actions-use-apt-tools@v1
