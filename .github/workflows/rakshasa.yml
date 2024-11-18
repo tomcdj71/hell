@@ -1,0 +1,253 @@
+name: Compile Libtorrent (Rakshasa)
+
+permissions: write-all
+
+on:
+  schedule:
+    - cron: "0 11 */2 * *"
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/rakshasa.yml'
+
+jobs:
+  build_libtorrent:
+    runs-on: ubuntu-24.04
+
+    strategy:
+      max-parallel: 1
+      matrix:
+        build_type:
+          - release
+          - nightly
+
+    env:
+      REPO_PATH: "${{ github.workspace }}/binaries"
+      CURRENT_LIBTORRENT_PATH: "${{ github.workspace }}/binaries/dist/current/libtorrent-rakshasa"
+      ARCHIVE_LIBTORRENT_PATH: "${{ github.workspace }}/binaries/dist/archive/libtorrent-rakshasa"
+      POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
+      SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
+      TIME_DIFF: 48  # hours
+
+    steps:
+      - uses: tecolicom/actions-use-apt-tools@v1
+        with:
+          tools: build-essential autoconf automake libtool pkg-config cmake git libssl-dev libcurl4-openssl-dev libsigc++-2.0-dev libncurses5-dev libncursesw5-dev libtool intltool checkinstall jq
+          cache: false
+
+      - name: Checkout Binaries Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ env.REPO_PATH }}
+
+      - name: Determine Libtorrent Version and Updates
+        id: libtorrent_update
+        env:
+          build_type: ${{ matrix.build_type }}
+          time_diff: ${{ env.TIME_DIFF }}
+        run: |
+          set -e
+          CURRENT_TIME=$(date +%s)
+          BUILD_TYPE="${build_type}"
+          if [ "$BUILD_TYPE" == "release" ]; then
+            LIBTORRENT_VERSION="0.13.8"
+            PACKAGE_SUFFIX=""
+            REF="v${LIBTORRENT_VERSION}"
+          elif [ "$BUILD_TYPE" == "nightly" ]; then
+            LIBTORRENT_VERSION="0.14.0"
+            PACKAGE_SUFFIX="-nightly"
+            REF="master"
+          else
+            echo "Invalid build type: $BUILD_TYPE"
+            exit 1
+          fi
+          REPO_URL="https://github.com/rakshasa/libtorrent"
+          git clone --depth 1 --branch "$REF" "$REPO_URL" ${{ github.workspace }}/libtorrent-rakshasa
+          cd ${{ github.workspace }}/libtorrent-rakshasa
+          git submodule update --init --recursive
+          LATEST_COMMIT_SHA=$(git rev-parse HEAD)
+          COMMIT_DATE=$(git show -s --format=%ci "${LATEST_COMMIT_SHA}")
+          if [ -z "$COMMIT_DATE" ]; then
+            echo "Warning: Unable to fetch the latest commit date for SHA '${LATEST_COMMIT_SHA}'. Assuming no updates."
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          COMMIT_EPOCH=$(date -d "$COMMIT_DATE" +%s)
+          TIME_DIFF_HOURS=$(( (CURRENT_TIME - COMMIT_EPOCH) / 3600 ))
+          echo "Latest commit was $TIME_DIFF_HOURS hours ago."
+          if (( TIME_DIFF_HOURS <= ${time_diff} )); then
+            UPDATE_NEEDED=true
+            echo "Recent commit detected. Proceeding with build."
+          else
+            UPDATE_NEEDED=false
+            echo "No recent commits in the last ${time_diff} hours. Skipping build."
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          PACKAGE_NAME="libtorrent21t64"
+          DEV_PACKAGE_NAME="libtorrent-dev"
+          ARCHITECTURE="amd64"
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME${PACKAGE_SUFFIX}" "$LIBTORRENT_VERSION" "${{ env.CURRENT_LIBTORRENT_PATH }}")
+          FULL_VERSION="${LIBTORRENT_VERSION}-1${BUILD_NUMBER}"
+          COMMIT_MESSAGE="Update libtorrent${PACKAGE_SUFFIX} to v${LIBTORRENT_VERSION} [automated]"
+          TMP_DIR=$(mktemp -d)
+          TMP_DIR=${TMP_DIR##*tmp.}
+          TMP_DIR="${{ env.REPO_PATH }}/$TMP_DIR"
+          mkdir -p $TMP_DIR
+          INSTALL_DIR=$(mktemp -d)
+          INSTALL_DIR=${INSTALL_DIR##*tmp.}
+          INSTALL_DIR="${{ env.REPO_PATH }}/$INSTALL_DIR"
+          variables=(UPDATE_NEEDED TMP_DIR INSTALL_DIR PACKAGE_NAME DEV_PACKAGE_NAME LIBTORRENT_VERSION FULL_VERSION BUILD_NUMBER COMMIT_MESSAGE CURRENT_DATE BUILD_TYPE PACKAGE_SUFFIX LATEST_COMMIT_SHA)
+          variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
+          for variable in "${variables_sorted[@]}"; do
+            lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
+            upper_variable=$(echo "$variable" | tr '[:lower:]' '[:upper:]')
+            value="${!variable}"
+            echo "${upper_variable} : ${value}"
+            echo "${lower_variable}=${value}" >> $GITHUB_OUTPUT
+          done
+
+      - name: Compile and Install Libtorrent
+        id: libtorrent_build
+        if: steps.libtorrent_update.outputs.update_needed == 'true'
+        env:
+          install_dir: ${{ steps.libtorrent_update.outputs.INSTALL_DIR }}
+          build_type: ${{ steps.libtorrent_update.outputs.BUILD_TYPE }}
+        run: |
+          set -e
+          cd ${{ github.workspace }}/libtorrent-rakshasa
+          if [ "$build_type" == "release" ]; then
+            if [ -d "${{ env.REPO_PATH }}/patches/libtorrent-rakshasa" ]; then
+              for patch in ${{ env.REPO_PATH }}/patches/libtorrent-rakshasa/*0.13.8.patch; do
+                echo "Applying patch $patch"
+                patch -p1 --fuzz=3 --ignore-whitespace --verbose < "$patch"
+              done
+            fi
+          fi
+          ./autogen.sh
+          ./configure \
+            --prefix=/usr \
+            --disable-debug \
+            --disable-dependency-tracking \
+            --with-posix-fallocate
+          make -j$(nproc)
+          make DESTDIR="${install_dir}" install
+          find "${install_dir}" -type f -executable -exec strip --strip-unneeded {} + || true
+          echo "libtorrent_compiled=true" >> $GITHUB_OUTPUT
+
+      - name: Generate Deb Files for Libtorrent
+        id: generate_deb_files
+        if: steps.libtorrent_build.outputs.libtorrent_compiled == 'true'
+        env:
+          full_version: ${{ steps.libtorrent_update.outputs.FULL_VERSION }}
+          package_suffix: ${{ steps.libtorrent_update.outputs.PACKAGE_SUFFIX }}
+          current_date: ${{ steps.libtorrent_update.outputs.CURRENT_DATE }}
+          install_dir: ${{ steps.libtorrent_update.outputs.INSTALL_DIR }}
+          tmp_dir: ${{ steps.libtorrent_update.outputs.TMP_DIR }}
+          pool_path: ${{ env.POOL_PATH }}
+          scripts_path: ${{ env.SCRIPTS_PATH }}
+        run: |
+          set -e
+          PACKAGE_NAMES=("libtorrent21t64" "libtorrent-dev")
+          for PACKAGE in "${PACKAGE_NAMES[@]}"; do
+            PACKAGE_NAME="${PACKAGE}"
+            PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
+            cd "${tmp_dir}"
+            sudo apt-get update
+            apt-get download "${PACKAGE_NAME}"
+            bash "${scripts_path}/generate_control.sh" \
+              "${PACKAGE_NAME}" \
+              "${install_dir}" \
+              "${tmp_dir}" \
+              "${full_version}" \
+              "${current_date}" \
+              "${pool_path}"
+            ORIGINAL_PACKAGE_FILE="${PACKAGE_NAME}_${full_version}_amd64.deb"
+            NEW_PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_amd64.deb"
+            if [ "${ORIGINAL_PACKAGE_FILE}" != "${NEW_PACKAGE_FILE}" ]; then
+              mv "${pool_path}/${ORIGINAL_PACKAGE_FILE}" "${pool_path}/${NEW_PACKAGE_FILE}"
+            fi
+            CHECKSUM=$(sha256sum "${pool_path}/${NEW_PACKAGE_FILE}" | awk '{ print $1 }')
+            package_var=$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g')
+            echo "${package_var}_checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
+            echo "${package_var}_file=${NEW_PACKAGE_FILE}" >> $GITHUB_OUTPUT
+          done
+          echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
+
+      - name: Archive and Upload Libtorrent Packages
+        id: archive_and_upload
+        if: steps.generate_deb_files.outputs.libtorrent_packaged == 'true'
+        env:
+          full_version: ${{ steps.libtorrent_update.outputs.FULL_VERSION }}
+          package_names: |
+            libtorrent21t64
+            libtorrent-dev
+          package_suffix: ${{ steps.libtorrent_update.outputs.PACKAGE_SUFFIX }}
+          pool_path: ${{ env.POOL_PATH }}
+          current_libtorrent_path: ${{ env.CURRENT_LIBTORRENT_PATH }}
+          archive_libtorrent_path: ${{ env.ARCHIVE_LIBTORRENT_PATH }}
+          scripts_path: ${{ env.SCRIPTS_PATH }}
+        run: |
+          set -e
+          for PACKAGE in $package_names; do
+            PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
+            PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_amd64.deb"
+            if [ -f "${pool_path}/${PACKAGE_FILE}" ]; then
+              bash "${scripts_path}/archive_packages.sh" \
+                "${current_libtorrent_path}" \
+                "${archive_libtorrent_path}" \
+                "${pool_path}/${PACKAGE_FILE}"
+            else
+              echo "Package ${PACKAGE_FILE} not found in ${pool_path}"
+            fi
+          done
+          echo "archive_processed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and Push Libtorrent Packages
+        if: steps.archive_and_upload.outputs.archive_processed == 'true'
+        uses: EndBug/add-and-commit@v9
+        env:
+          commit_message: ${{ steps.libtorrent_update.outputs.COMMIT_MESSAGE }}
+          author_email: "${{ secrets.COMMITER_EMAIL }}"
+          author_name: "${{ secrets.COMMITER_NAME }}"
+        with:
+          author_name: "${{ env.author_name }}"
+          author_email: "${{ env.author_email }}"
+          default_author: user_info
+          message: ${{ env.commit_message }}
+          cwd: "./binaries"
+          add: |
+            dist/current/libtorrent-rakshasa/
+            dist/archive/libtorrent-rakshasa/
+          push: true
+          pull: "--rebase --autostash"
+
+      - name: Trigger Update Manifest Workflow
+        if: steps.archive_and_upload.outputs.archive_processed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        env:
+          full_version: ${{ steps.libtorrent_update.outputs.FULL_VERSION }}
+          current_date: ${{ steps.libtorrent_update.outputs.CURRENT_DATE }}
+          package_suffix: ${{ steps.libtorrent_update.outputs.PACKAGE_SUFFIX }}
+        with:
+          event-type: update-manifest
+          client-payload: |
+            {
+              "package_updates": {
+                "libtorrent21t64${{ env.package_suffix }}": {
+                  "checksum": "${{ steps.generate_deb_files.outputs.libtorrent21t64${{ env.package_suffix }}_checksum }}",
+                  "version": "${{ env.full_version }}",
+                  "category": "libtorrent",
+                  "build_date": "${{ env.current_date }}"
+                },
+                "libtorrent-dev${{ env.package_suffix }}": {
+                  "checksum": "${{ steps.generate_deb_files.outputs.libtorrent_dev${{ env.package_suffix }}_checksum }}",
+                  "version": "${{ env.full_version }}",
+                  "category": "libtorrent",
+                  "build_date": "${{ env.current_date }}"
+                }
+              }
+            }
