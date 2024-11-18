@@ -38,6 +38,8 @@ jobs:
             libtorrent_package_name: "libtorrent21t64"
             libtorrent_dev_package_name: "libtorrent-dev"
             libudns_required: true
+            libudns_package_name: "libudns0"
+            libudns_dev_package_name: "libudns-dev"
             package_suffix: ""
             patches:
               - "lockfile-fix.patch"
@@ -53,6 +55,8 @@ jobs:
             libtorrent_package_name: "libtorrent21t64-nightly"
             libtorrent_dev_package_name: "libtorrent-dev-nightly"
             libudns_required: true
+            libudns_package_name: "libudns0"
+            libudns_dev_package_name: "libudns-dev"
             package_suffix: "-nightly"
             patches: []
 
@@ -125,17 +129,17 @@ jobs:
         run: |
           sudo apt-get update -yqq
           sudo apt-get install -yqq build-essential g++ autoconf automake libtool curl git autoconf-archive \
-            bc checkinstall dstat fontconfig ruby-full libcppunit-dev libcurl4-openssl-dev \
+            bc checkinstall dstat fontconfig libcppunit-dev libcurl4-openssl-dev \
             autotools-dev pkg-config unzip yasm zip zlib1g-dev cmake libssl-dev dos2unix jq
-          sudo gem install fpm
 
       - name: Install libudns
         if: steps.rtorrent_update.outputs.update_needed == 'true' && matrix.libudns_required == true
         run: |
           echo "Installing libudns" 
           cd ${{ env.REPO_PATH }}
-          sudo dpkg -i dist/current/libudns/libudns*.deb || {
-            echo "libudns not found. Exiting."
+          for package in ${{ matrix.libudns_package_name }} ${{ matrix.libudns_dev_package_name }}
+          sudo dpkg -i dist/current/libudns/${package}*.deb || {
+            echo "${package} not found. Exiting."
             exit 1
           }
 
