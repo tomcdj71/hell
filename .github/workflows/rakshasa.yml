@@ -127,6 +127,10 @@ jobs:
               done
             fi
           fi
+          if [ ! -f ./autogen.sh ]; then
+            cp -pR ${{ env.SCRIPTS_PATH }}/libtorrent-autogen.sh ./autogen.sh
+            chmod +x ./autogen.sh
+          fi
           ./autogen.sh
           ./configure \
             --prefix=/usr \
