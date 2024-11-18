@@ -12,7 +12,7 @@ on:
       - '.github/workflows/rakshasa.yml'
 
 jobs:
-  build_libtorrent:
+  libtorrent:
     runs-on: ubuntu-24.04
 
     strategy:
@@ -153,8 +153,10 @@ jobs:
           tmp_dir: ${{ steps.libtorrent_update.outputs.TMP_DIR }}
           pool_path: ${{ env.POOL_PATH }}
           scripts_path: ${{ env.SCRIPTS_PATH }}
+          output_dir: ${{ github.workspace }}/outputs
         run: |
-          set -e 
+          set -e
+          mkdir -p "${output_dir}"
           PACKAGE_NAMES=("libtorrent21t64" "libtorrent-dev")
           for PACKAGE in "${PACKAGE_NAMES[@]}"; do
             PACKAGE_NAME="${PACKAGE}"
@@ -179,7 +181,22 @@ jobs:
             echo "${package_var}_checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
             echo "${package_var}_file=${NEW_PACKAGE_FILE}" >> $GITHUB_OUTPUT
           done
+          echo "{
+              \"package_name\": \"${PACKAGE_FILE_NAME}\",
+              \"checksum\": \"${CHECKSUM}\",
+              \"version\": \"${full_version}\",
+              \"category\": \"libtorrent\",
+              \"build_date\": \"${current_date}\"
+            }" > "${output_dir}/${PACKAGE_FILE_NAME}.json"
+          done
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
+      
+      - name: Upload Package Data
+        if: steps.archive_and_upload.outputs.archive_processed == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: libtorrent-output-${{ matrix.build_type }}
+          path: ${{ github.workspace }}/outputs/*.json
 
       - name: Archive and Upload Libtorrent Packages
         id: archive_and_upload
@@ -229,29 +246,43 @@ jobs:
           push: true
           pull: "--rebase --autostash"
 
+  trigger_manifest_update:
+    needs: build_libtorrent
+    runs-on: ubuntu-24.04
+    if: always()
+    steps:
+      - name: Checkout Binaries Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ env.REPO_PATH }}
+
+      - name: Download Package Data
+        uses: actions/download-artifact@v3
+        with:
+          name: libtorrent-output-release
+          path: ${{ github.workspace }}/outputs
+
+      - name: Download Package Data Nightly
+        uses: actions/download-artifact@v3
+        with:
+          name: libtorrent-output-nightly
+          path: ${{ github.workspace }}/outputs
+
+      - name: Collect Outputs
+        run: |
+          set -e
+          output_dir="${{ github.workspace }}/outputs"
+          manifest_updates="{\"package_updates\": {}}"
+          for output_file in "${output_dir}"/*.json; do
+            package_data=$(cat "${output_file}")
+            package_name=$(echo "${package_data}" | jq -r '.package_name')
+            manifest_updates=$(echo "${manifest_updates}" | jq ".package_updates += {\"${package_name}\": ${package_data}}")
+          done
+          echo "${manifest_updates}" > "${output_dir}/manifest_updates.json"
+
       - name: Trigger Update Manifest Workflow
-        if: steps.archive_and_upload.outputs.archive_processed == 'true'
         uses: peter-evans/repository-dispatch@v3
-        env:
-          full_version: ${{ steps.libtorrent_update.outputs.FULL_VERSION }}
-          current_date: ${{ steps.libtorrent_update.outputs.CURRENT_DATE }}
-          package_suffix: ${{ steps.libtorrent_update.outputs.PACKAGE_SUFFIX }}
         with:
           event-type: update-manifest
-          client-payload: |
-            {
-              "package_updates": {
-                "libtorrent21t64${{ env.package_suffix }}": {
-                  "checksum": "${{ steps.generate_deb_files.outputs.libtorrent21t64_checksum }}",
-                  "version": "${{ env.full_version }}",
-                  "category": "libtorrent",
-                  "build_date": "${{ env.current_date }}"
-                },
-                "libtorrent-dev${{ env.package_suffix }}": {
-                  "checksum": "${{ steps.generate_deb_files.outputs.libtorrent_dev_checksum }}",
-                  "version": "${{ env.full_version }}",
-                  "category": "libtorrent",
-                  "build_date": "${{ env.current_date }}"
-                }
-              }
-            }
+          client-payload: ${{ toJSON(fromJson(file('${{ github.workspace }}/outputs/manifest_updates.json'))) }}

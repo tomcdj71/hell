@@ -132,6 +132,10 @@ if [ "$NO_CHECK" = false ]; then
   old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
   echo "Performing rsync to merge installation files..."
   rsync -auv --existing "$INSTALL_DIR/" "./"
+  if [ "$PACKAGE_NAME" == "libtorrent-dev-nightly" ]; then
+    echo "Editing /usr/lib/x86_64-linux-gnu/pkgconfig/libtorrent.pc file to change the version to 0.14.0"
+    sed -i "s/^Version: .*/Version: 0.14.0/" "/usr/lib/x86_64-linux-gnu/pkgconfig/libtorrent.pc"
+  fi
   installed_size=$(du -sk . | cut -f1)
   echo "Old Installed-Size: $old_installed_size kB"
   echo "New Installed-Size: $installed_size kB"
