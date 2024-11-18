@@ -64,7 +64,7 @@ packages:
     - bookworm
   rtorrent:
     version: 0.9.8-1build1
-    checksum_sha256: 1f68a8a171d1718185a2e06aa50fa5a6abb4cbfa32e61b0da6fa9cbb63e88d8f
+    checksum_sha256: 4925c83f3271e2ebb65d2f1469e3cafc8b8e8694da4c80f970d9a4eb56f7f634
     category: rtorrent
     build_date: '2024-11-18'
     distribution:
