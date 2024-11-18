@@ -76,7 +76,8 @@ elif [ "$PACKAGE_NAME" == "python3-libtorrent" ]; then
   echo "Modifying 'Depends' field for $PACKAGE_NAME"
   sed -i "s/^\(Depends:.*libtorrent-rasterbar2.*(>=\s*\)[^)]*\()\)/\1$FULL_VERSION\2/" "$control_file"
 fi
-
+current_version=$(grep "^Version:" "$control_file" | awk '{print $2}')
+sed -i "s/$current_version/$FULL_VERSION/g" "$control_file"
 # Reordering the Description field in the control file
 echo "Reordering Description field in \"$control_file\""
 desc_file="${control_file}.description"
