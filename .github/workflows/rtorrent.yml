@@ -160,7 +160,7 @@ jobs:
           echo "Installing libtorrent-rakshasa"
           cd ${{ env.REPO_PATH }}
           for package in libtorrent21t64_${{ matrix.libtorrent_version }} libtorrent-dev_${{ matrix.libtorrent_version }}; do
-            sudo dpkg -i dist/current/libudns/${package}*.deb || {
+            sudo dpkg -i dist/current/libtorrent-rakshasa/${package}*.deb || {
               echo "${package} not found. Exiting."
               exit 1
             }
