@@ -154,7 +154,7 @@ jobs:
           pool_path: ${{ env.POOL_PATH }}
           scripts_path: ${{ env.SCRIPTS_PATH }}
         run: |
-          set -e
+          set -e 
           PACKAGE_NAMES=("libtorrent21t64" "libtorrent-dev")
           for PACKAGE in "${PACKAGE_NAMES[@]}"; do
             PACKAGE_NAME="${PACKAGE}"

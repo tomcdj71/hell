@@ -77,9 +77,9 @@ elif [ "$PACKAGE_NAME" == "python3-libtorrent" ]; then
   sed -i "s/^\(Depends:.*libtorrent-rasterbar2.*(>=\s*\)[^)]*\()\)/\1$FULL_VERSION\2/" "$control_file"
 elif [ "$PACKAGE_NAME" == "libtorrent21t64-nightly" ]; then
   echo "Modifying control fields for $PACKAGE_NAME"
-  sed -i "s/^Package: .*/Package: libtorrent21t64/" "$control_file"
-  sed -i "s/^Provides: .*/Provides: libtorrent21 (= $FULL_VERSION)/" "$control_file"
-  sed -i "s/^Breaks: .*/Breaks: libtorrent21t64 (<< $FULL_VERSION)/" "$control_file"
+  sed -i "s/^Package: .*/Package: libtorrent/" "$control_file"
+  sed -i "s/^Provides: .*/Provides: libtorrent (= $FULL_VERSION)/" "$control_file"
+  sed -i "s/^Breaks: .*/Breaks: libtorrent21t64 (<< $FULL_VERSION), libtorrent21 (<< $FULL_VERSION)/" "$control_file"
   sed -i "s/^Replaces: .*/Replaces: libtorrent21t64/" "$control_file"
 elif [ "$PACKAGE_NAME" == "libtorrent-dev-nightly" ]; then
   echo "Modifying Depends field for $PACKAGE_NAME"
