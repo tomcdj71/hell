@@ -137,11 +137,12 @@ jobs:
         run: |
           echo "Installing libudns" 
           cd ${{ env.REPO_PATH }}
-          for package in ${{ matrix.libudns_package_name }} ${{ matrix.libudns_dev_package_name }}
-          sudo dpkg -i dist/current/libudns/${package}*.deb || {
-            echo "${package} not found. Exiting."
-            exit 1
-          }
+          for package in ${{ matrix.libudns_package_name }} ${{ matrix.libudns_dev_package_name }}; do
+            sudo dpkg -i dist/current/libudns/${package}*.deb || {
+              echo "${package} not found. Exiting."
+              exit 1
+            }
+           done
 
       - name: Install xmlrpc-c
         if: steps.rtorrent_update.outputs.update_needed == 'true'
