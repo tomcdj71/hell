@@ -159,11 +159,12 @@ jobs:
         run: |
           echo "Installing libtorrent-rakshasa"
           cd ${{ env.REPO_PATH }}
-          LIBTORRENT_FILE=$(ls dist/current/libtorrent-rakshasa/${{ matrix.libtorrent_package_name }}_${{ matrix.libtorrent_version }}*.deb)
-          sudo dpkg -i ${LIBTORRENT_FILE} || {
-            echo "libtorrent-rakshasa not found. Exiting."
-            exit 1
-          }
+          for package in libtorrent21t64_${{ matrix.libtorrent_version }} libtorrent-dev_${{ matrix.libtorrent_version }}; do
+            sudo dpkg -i dist/current/libudns/${package}*.deb || {
+              echo "${package} not found. Exiting."
+              exit 1
+            }
+          done
 
       - name: Apply Patches for rtorrent
         if: steps.rtorrent_update.outputs.update_needed == 'true' && contains(join(matrix.patches), 'patch')
