@@ -1,0 +1,329 @@
+name: Compile rtorrent
+
+permissions: write-all
+
+on:
+  schedule:
+    - cron: "0 12 */2 * *"
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/rtorrent.yml'
+
+jobs:
+  build_rtorrent:
+    runs-on: ubuntu-24.04
+
+    env:
+      REPO_PATH: "${{ github.workspace }}/binaries"
+      POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
+      CURRENT_RTORRENT_PATH: "${{ github.workspace }}/binaries/dist/current/rtorrent"
+      ARCHIVE_RTORRENT_PATH: "${{ github.workspace }}/binaries/dist/archive/rtorrent"
+      PATCHES_PATH: "${{ github.workspace }}/binaries/patches"
+      SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
+      TIME_DIFF: 48000  # hours
+
+    strategy:
+      max-parallel: 1
+      matrix:
+        rtorrent_version:
+          - "0.9.8"
+          - "0.10.0"
+        include:
+          - rtorrent_version: "0.9.8"
+            xmlrpc_branch: "stable"
+            xmlrpc_package_name: "xmlrpc-c-stable"
+            libtorrent_version: "0.13.8"
+            libtorrent_package_name: "libtorrent21t64"
+            libtorrent_dev_package_name: "libtorrent-dev"
+            libudns_required: true
+            package_suffix: ""
+            patches:
+              - "lockfile-fix.patch"
+              - "scgi-fix.patch"
+              - "session-file-fix.patch"
+              - "rtorrent-scrape-0.9.8.patch"
+              - "fast-session-loading-0.9.8.patch"
+              - "network-port.patch"
+          - rtorrent_version: "0.10.0"
+            xmlrpc_branch: "advanced"
+            xmlrpc_package_name: "xmlrpc-c-advanced"
+            libtorrent_version: "0.14.0"
+            libtorrent_package_name: "libtorrent21t64-nightly"
+            libtorrent_dev_package_name: "libtorrent-dev-nightly"
+            libudns_required: true
+            package_suffix: "-nightly"
+            patches: []
+
+    steps:
+      - name: Checkout Binaries Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ env.REPO_PATH }}
+
+      - name: Determine rtorrent Version and Updates
+        id: rtorrent_update
+        env:
+          time_diff: ${{ env.TIME_DIFF }}
+          package_suffix: ${{ matrix.package_suffix }}
+        run: |
+          set -e
+          CURRENT_TIME=$(date +%s)
+          VERSION="${{ matrix.rtorrent_version }}"
+          if [ "$VERSION" == "0.9.8" ]; then
+            REF="v0.9.8"
+          else
+            REF="master"
+          fi
+          REPO_URL="https://github.com/rakshasa/rtorrent"
+          # Clone the rtorrent repository
+          git clone --depth 1 --branch "$REF" "$REPO_URL" ${{ github.workspace }}/rtorrent
+          cd ${{ github.workspace }}/rtorrent
+          LATEST_COMMIT_SHA=$(git rev-parse HEAD)
+          COMMIT_DATE=$(git show -s --format=%ci "${LATEST_COMMIT_SHA}")
+          if [ -z "$COMMIT_DATE" ]; then
+            echo "Warning: Unable to fetch the latest commit date for SHA '${LATEST_COMMIT_SHA}'. Assuming no updates."
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          COMMIT_EPOCH=$(date -d "$COMMIT_DATE" +%s)
+          TIME_DIFF_HOURS=$(( (CURRENT_TIME - COMMIT_EPOCH) / 3600 ))
+          echo "Latest commit was $TIME_DIFF_HOURS hours ago."
+          if (( TIME_DIFF_HOURS <= ${time_diff} )); then
+            UPDATE_NEEDED=true
+            echo "Recent commit detected. Proceeding with build."
+          else
+            UPDATE_NEEDED=false
+            echo "No recent commits in the last ${time_diff} hours. Skipping build."
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          PACKAGE_NAME="rtorrent"
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME${package_suffix}" "$VERSION" "${{ env.CURRENT_RTORRENT_PATH }}")
+          FULL_VERSION="${VERSION}-1${BUILD_NUMBER}"
+          COMMIT_MESSAGE="Update rtorrent${package_suffix} to v${VERSION} [automated]"
+          TMP_DIR=$(mktemp -d)
+          TMP_DIR=${TMP_DIR##*tmp.}
+          TMP_DIR="${{ env.REPO_PATH }}/$TMP_DIR"
+          mkdir -p $TMP_DIR
+          INSTALL_DIR="${{ github.workspace }}/rtorrent/build"
+          variables=(UPDATE_NEEDED TMP_DIR INSTALL_DIR PACKAGE_NAME VERSION FULL_VERSION BUILD_NUMBER COMMIT_MESSAGE CURRENT_DATE package_suffix LATEST_COMMIT_SHA)
+          variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
+          for variable in "${variables_sorted[@]}"; do
+            lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
+            upper_variable=$(echo "$variable" | tr '[:lower:]' '[:upper:]')
+            value="${!variable}"
+            echo "${upper_variable} : ${value}"
+            echo "${lower_variable}=${value}" >> $GITHUB_OUTPUT
+          done
+
+      - name: Set up Build Environment
+        if: steps.rtorrent_update.outputs.update_needed == 'true'
+        run: |
+          sudo apt-get update -yqq
+          sudo apt-get install -yqq build-essential g++ autoconf automake libtool curl git autoconf-archive \
+            bc checkinstall dstat fontconfig ruby-full libcppunit-dev libcurl4-openssl-dev \
+            autotools-dev pkg-config unzip yasm zip zlib1g-dev cmake libssl-dev dos2unix jq
+          sudo gem install fpm
+
+      - name: Install libudns
+        if: steps.rtorrent_update.outputs.update_needed == 'true' && matrix.libudns_required == true
+        run: |
+          echo "Installing libudns" 
+          cd ${{ env.REPO_PATH }}
+          sudo dpkg -i dist/current/libudns/libudns*.deb || {
+            echo "libudns not found. Exiting."
+            exit 1
+          }
+
+      - name: Install xmlrpc-c
+        if: steps.rtorrent_update.outputs.update_needed == 'true'
+        run: |
+          echo "Installing xmlrpc-c"
+          cd ${{ env.REPO_PATH }}
+          sudo dpkg -i dist/current/xmlrpc-c/${{ matrix.xmlrpc_package_name }}*.deb || {
+            echo "xmlrpc-c not found. Exiting."
+            exit 1
+          }
+
+      - name: Install libtorrent-rakshasa
+        if: steps.rtorrent_update.outputs.update_needed == 'true'
+        run: |
+          echo "Installing libtorrent-rakshasa"
+          cd ${{ env.REPO_PATH }}
+          LIBTORRENT_FILE=$(ls dist/current/libtorrent-rakshasa/${{ matrix.libtorrent_package_name }}_${{ matrix.libtorrent_version }}*.deb)
+          sudo dpkg -i ${LIBTORRENT_FILE} || {
+            echo "libtorrent-rakshasa not found. Exiting."
+            exit 1
+          }
+
+      - name: Apply Patches for rtorrent
+        if: steps.rtorrent_update.outputs.update_needed == 'true' && contains(join(matrix.patches), 'patch')
+        run: |
+          cd ${{ github.workspace }}/rtorrent
+          find ${{ env.PATCHES_PATH }}/rtorrent -type f -name '*.patch' -exec dos2unix {} +
+          for patch in ${{ env.PATCHES_PATH }}/rtorrent/*.patch; do
+            if [ -f "$patch" ]; then
+              echo "Applying patch $patch"
+              patch -p1 --fuzz=3 --ignore-whitespace --verbose < "$patch"
+            else
+              echo "Warning: $patch is not a valid file. Skipping."
+            fi
+          done
+
+      - name: Configure rtorrent
+        if: steps.rtorrent_update.outputs.update_needed == 'true'
+        id: configure_rtorrent
+        run: |
+          set -e
+          cd ${{ github.workspace }}/rtorrent
+          if [ ! -f "autogen.sh" ]; then
+            autoreconf -vfi
+          else
+            ./autogen.sh
+          fi
+          ./configure --prefix=/usr --with-xmlrpc-c --with-ncurses --disable-shared LDFLAGS='-static'
+          echo "configured=true" >> $GITHUB_OUTPUT
+
+      - name: Compile rtorrent
+        if: steps.configure_rtorrent.outputs.configured == 'true'
+        id: compile_rtorrent
+        run: |
+          set -e
+          cd ${{ github.workspace }}/rtorrent
+          rtorrent_pipe=""
+          rtorrent_level=""
+          rtorrent_flto=""
+          rtorrent_profile="-fprofile-use"
+          stdc="-std=c++14"
+          nproc_count=$(nproc)
+          mem_available_kb=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
+          mem_available_mb=$((mem_available_kb / 1024))
+          case "$nproc_count" in
+            1)
+              rtorrent_level="-O1"
+              ;;
+            [2-3])
+              rtorrent_level="-O2"
+              ;;
+            [4-7])
+              rtorrent_level="-O2"
+              rtorrent_flto="-flto=$nproc_count"
+              ;;
+            *)
+              rtorrent_level="-O3"
+              rtorrent_flto="-flto=$nproc_count"
+              ;;
+          esac
+          if [ "$mem_available_mb" -gt 512 ]; then
+            rtorrent_pipe="-pipe"
+          fi
+          make -j"$nproc_count" CXXFLAGS="-w $rtorrent_level $rtorrent_flto $rtorrent_pipe $stdc $rtorrent_profile"
+          make DESTDIR="${{ steps.rtorrent_update.outputs.INSTALL_DIR }}" install
+          echo "compiled=true" >> $GITHUB_OUTPUT
+
+      - name: Generate Deb File for rtorrent
+        id: generate_deb_file
+        if: steps.compile_rtorrent.outputs.compiled == 'true'
+        env:
+          package_name: ${{ steps.rtorrent_update.outputs.PACKAGE_NAME }}
+          package_suffix: ${{ steps.rtorrent_update.outputs.package_suffix }}
+          full_version: ${{ steps.rtorrent_update.outputs.FULL_VERSION }}
+          current_date: ${{ steps.rtorrent_update.outputs.CURRENT_DATE }}
+          install_dir: ${{ steps.rtorrent_update.outputs.INSTALL_DIR }}
+          tmp_dir: ${{ steps.rtorrent_update.outputs.TMP_DIR }}
+          pool_path: ${{ env.POOL_PATH }}
+          scripts_path: ${{ env.SCRIPTS_PATH }}
+        run: |
+          set -e
+          PACKAGE_FILE_NAME="${package_name}${package_suffix}"
+          cd "${tmp_dir}"
+          sudo apt-get update
+          apt-get download "${package_name}"
+          bash "${scripts_path}/generate_control.sh" \
+            "${package_name}" \
+            "${install_dir}" \
+            "${tmp_dir}" \
+            "${full_version}" \
+            "${current_date}" \
+            "${pool_path}"
+          ORIGINAL_PACKAGE_FILE="${package_name}_${full_version}_amd64.deb"
+          NEW_PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_amd64.deb"
+          if [ "${ORIGINAL_PACKAGE_FILE}" != "${NEW_PACKAGE_FILE}" ]; then
+            mv "${pool_path}/${ORIGINAL_PACKAGE_FILE}" "${pool_path}/${NEW_PACKAGE_FILE}"
+          fi
+          CHECKSUM=$(sha256sum "${pool_path}/${NEW_PACKAGE_FILE}" | awk '{ print $1 }')
+          echo "checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
+          echo "package_file=${NEW_PACKAGE_FILE}" >> $GITHUB_OUTPUT
+          echo "rtorrent_packaged=true" >> $GITHUB_OUTPUT
+
+      - name: Archive and Upload rtorrent Package
+        id: archive_packages
+        if: steps.generate_deb_file.outputs.rtorrent_packaged == 'true'
+        run: |
+          set -e
+          PACKAGE_FILE="${{ steps.generate_deb_file.outputs.package_file }}"
+          bash ${{ env.SCRIPTS_PATH }}/archive_packages.sh \
+            "${{ env.CURRENT_RTORRENT_PATH }}" \
+            "${{ env.ARCHIVE_RTORRENT_PATH }}" \
+            "${{ env.POOL_PATH }}/${PACKAGE_FILE}"
+          echo "archive_processed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and Push Package
+        if: steps.archive_packages.outputs.archive_processed == 'true'
+        uses: EndBug/add-and-commit@v9
+        env:
+          commit_message: ${{ steps.rtorrent_update.outputs.COMMIT_MESSAGE }}
+          author_email: "${{ secrets.COMMITER_EMAIL }}"
+          author_name: "${{ secrets.COMMITER_NAME }}"
+        with:
+          author_name: "${{ env.author_name }}"
+          author_email: "${{ env.author_email }}"
+          default_author: user_info
+          message: ${{ env.commit_message }}
+          cwd: "./binaries"
+          add: |
+            dist/current/rtorrent/
+            dist/archive/rtorrent/
+          push: true
+          pull: "--rebase --autostash"
+
+      - name: Trigger Update Manifest Workflow
+        if: steps.archive_packages.outputs.archive_processed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        env:
+          full_version: ${{ steps.rtorrent_update.outputs.FULL_VERSION }}
+          current_date: ${{ steps.rtorrent_update.outputs.CURRENT_DATE }}
+          package_name: ${{ steps.rtorrent_update.outputs.PACKAGE_NAME }}
+          package_suffix: ${{ steps.rtorrent_update.outputs.package_suffix }}
+          checksum: ${{ steps.generate_deb_file.outputs.checksum }}
+        with:
+          event-type: update-manifest
+          client-payload: |
+            {
+              "package_updates": {
+                "${{ env.package_name }}${{ env.package_suffix }}": {
+                  "checksum": "${{ env.checksum }}",
+                  "version": "${{ env.full_version }}",
+                  "category": "rtorrent",
+                  "build_date": "${{ env.current_date }}"
+                }
+              }
+            }
+
+      - name: Trigger Create Release Workflow
+        if: steps.archive_packages.outputs.archive_processed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        env:
+          package_name: "${{ steps.rtorrent_update.outputs.PACKAGE_NAME }}${{ steps.rtorrent_update.outputs.package_suffix }}"
+          package_version: ${{ steps.rtorrent_update.outputs.FULL_VERSION }}
+        with:
+          event-type: create-release
+          client-payload: |
+            {
+              "package_name": "${{ env.package_name }}",
+              "package_version": "${{ env.package_version }}"
+            }
