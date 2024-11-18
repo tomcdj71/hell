@@ -148,7 +148,7 @@ jobs:
           cd ${{ env.REPO_PATH }}
           sudo dpkg -i dist/current/xmlrpc-c/${{ matrix.xmlrpc_package_name }}*.deb || {
             echo "xmlrpc-c not found. Exiting."
-            exit 1
+            exit 1 
           }
 
       - name: Install libtorrent-rakshasa
