@@ -171,7 +171,7 @@ jobs:
               mv "${pool_path}/${ORIGINAL_PACKAGE_FILE}" "${pool_path}/${NEW_PACKAGE_FILE}"
             fi
             CHECKSUM=$(sha256sum "${pool_path}/${NEW_PACKAGE_FILE}" | awk '{ print $1 }')
-            package_var=$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g')
+            package_var=$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g' | sed 's/_nightly//')
             echo "${package_var}_checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
             echo "${package_var}_file=${NEW_PACKAGE_FILE}" >> $GITHUB_OUTPUT
           done
@@ -238,13 +238,13 @@ jobs:
             {
               "package_updates": {
                 "libtorrent21t64${{ env.package_suffix }}": {
-                  "checksum": "${{ steps.generate_deb_files.outputs.libtorrent21t64${{ env.package_suffix }}_checksum }}",
+                  "checksum": "${{ steps.generate_deb_files.outputs.libtorrent21t64_checksum }}",
                   "version": "${{ env.full_version }}",
                   "category": "libtorrent",
                   "build_date": "${{ env.current_date }}"
                 },
                 "libtorrent-dev${{ env.package_suffix }}": {
-                  "checksum": "${{ steps.generate_deb_files.outputs.libtorrent_dev${{ env.package_suffix }}_checksum }}",
+                  "checksum": "${{ steps.generate_deb_files.outputs.libtorrent_dev_checksum }}",
                   "version": "${{ env.full_version }}",
                   "category": "libtorrent",
                   "build_date": "${{ env.current_date }}"
