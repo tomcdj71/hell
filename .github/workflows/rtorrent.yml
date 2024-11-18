@@ -12,7 +12,7 @@ on:
       - '.github/workflows/rtorrent.yml'
 
 jobs:
-  build_rtorrent:
+  rtorrent:
     runs-on: ubuntu-24.04
 
     env:
@@ -124,13 +124,10 @@ jobs:
             echo "${lower_variable}=${value}" >> $GITHUB_OUTPUT
           done
 
-      - name: Set up Build Environment
-        if: steps.rtorrent_update.outputs.update_needed == 'true'
-        run: |
-          sudo apt-get update -yqq
-          sudo apt-get install -yqq build-essential g++ autoconf automake libtool curl git autoconf-archive \
-            bc checkinstall dstat fontconfig libcppunit-dev libcurl4-openssl-dev \
-            autotools-dev pkg-config unzip yasm zip zlib1g-dev cmake libssl-dev dos2unix jq
+      - uses: tecolicom/actions-use-apt-tools@v1
+        with:
+          tools: build-essential g++ autoconf automake libtool curl git autoconf-archive  bc checkinstall dstat fontconfig libcppunit-dev libcurl4-openssl-dev autotools-dev pkg-config unzip yasm zip zlib1g-dev cmake libssl-dev dos2unix jq libsigc++-2.0-dev
+          cache: false 
 
       - name: Install libudns
         if: steps.rtorrent_update.outputs.update_needed == 'true' && matrix.libudns_required == true
