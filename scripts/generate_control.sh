@@ -22,6 +22,7 @@ TMPDIR="$3"
 FULL_VERSION="$4"
 CURRENT_DATE="$5"
 POOL_PATH="$6"
+PACKAGE_SUFFIX="$7"
 PACKAGE_DIR="${TMPDIR}/package/${PACKAGE_NAME}"
 USERNAME=$(whoami)
 
@@ -38,6 +39,7 @@ echo "CURRENT_DATE: $CURRENT_DATE"
 echo "POOL_PATH: $POOL_PATH"
 echo "PACKAGE_DIR: $PACKAGE_DIR"
 echo "NO_CHECK: $NO_CHECK"
+echo "PACKAGE_SUFFIX: $PACKAGE_SUFFIX"
 echo "=================="
 
 # Find the correct package file
@@ -75,15 +77,15 @@ if [ "$PACKAGE_NAME" == "libtorrent-rasterbar-dev" ]; then
 elif [ "$PACKAGE_NAME" == "python3-libtorrent" ]; then
   echo "Modifying 'Depends' field for $PACKAGE_NAME"
   sed -i "s/^\(Depends:.*libtorrent-rasterbar2.*(>=\s*\)[^)]*\()\)/\1$FULL_VERSION\2/" "$control_file"
-elif [ "$PACKAGE_NAME" == "libtorrent21t64-nightly" ]; then
+elif [ "$PACKAGE_NAME" == "libtorrent21t64" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
   echo "Modifying control fields for $PACKAGE_NAME"
   sed -i "s/^Package: .*/Package: libtorrent/" "$control_file"
   sed -i "s/^Provides: .*/Provides: libtorrent (= $FULL_VERSION)/" "$control_file"
   sed -i "s/^Breaks: .*/Breaks: libtorrent21t64 (<< $FULL_VERSION), libtorrent21 (<< $FULL_VERSION)/" "$control_file"
   sed -i "s/^Replaces: .*/Replaces: libtorrent21t64/" "$control_file"
-elif [ "$PACKAGE_NAME" == "libtorrent-dev-nightly" ]; then
-  echo "Modifying Depends field for $PACKAGE_NAME"
-  sed -i "s/libtorrent21t64/libtorrent/g" "$control_file"
+elif [ "$PACKAGE_NAME" == "libtorrent-dev" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
+    echo "Modifying field for $PACKAGE_NAME$PACKAGE_SUFFIX"
+    sed -i "s/libtorrent21t64/libtorrent/g" "$control_file"
 fi
 current_version=$(grep "^Version:" "$control_file" | awk '{print $2}')
 sed -i "s/$current_version/$FULL_VERSION/g" "$control_file"
@@ -132,15 +134,12 @@ if [ "$NO_CHECK" = false ]; then
   old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
   echo "Performing rsync to merge installation files..."
   rsync -auv --existing "$INSTALL_DIR/" "./"
-  if [ "$PACKAGE_NAME" == "libtorrent-dev-nightly" ]; then
-  LIBTORRENT_PC_PATH="$(find . -name libtorrent.pc)"
-  if [ ! -f "$LIBTORRENT_PC_PATH" ]; then
-    echo "libtorrent.pc does not exist in the package. Copying it over."
+  if [ "$PACKAGE_NAME" == "libtorrent-dev" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
+    LIBTORRENT_PC_PATH="$(find . -name libtorrent.pc)"
     cp "$INSTALL_DIR/usr/lib/x86_64-linux-gnu/pkgconfig/libtorrent.pc" "$LIBTORRENT_PC_PATH"
+    echo "Editing libtorrent.pc file to change the version to $FULL_VERSION"
+    sed -i "s/^Version: .*/Version: 0.14.0/" "$LIBTORRENT_PC_PATH"
   fi
-  echo "Editing libtorrent.pc file to change the version to $FULL_VERSION"
-  sed -i "s/^Version: .*/Version: 0.14.0/" "$LIBTORRENT_PC_PATH"
-fi
   installed_size=$(du -sk . | cut -f1)
   echo "Old Installed-Size: $old_installed_size kB"
   echo "New Installed-Size: $installed_size kB"
