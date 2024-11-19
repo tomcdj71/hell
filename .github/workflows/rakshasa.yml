@@ -164,6 +164,7 @@ jobs:
           PACKAGE_NAME: ${{ steps.libtorrent_update.outputs.package_name }}
           DEV_PACKAGE_NAME: ${{ steps.libtorrent_update.outputs.dev_package_name }}
           ARCHITECTURE: ${{ steps.libtorrent_update.outputs.architecture }}
+          LOCAL_PACKAGE_PATH: ${{ env.CURRENT_LIBTORRENT_PATH }}
         run: |
           set -e
           mkdir -p "${output_dir}"
