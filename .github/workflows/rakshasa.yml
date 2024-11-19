@@ -189,13 +189,6 @@ jobs:
               \"build_date\": \"${current_date}\"
             }" > "${output_dir}/${PACKAGE_FILE_NAME}.json"
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
-      
-      - name: Upload Package Data
-        if: steps.archive_and_upload.outputs.archive_processed == 'true'
-        uses: actions/upload-artifact@v3
-        with:
-          name: libtorrent-output-${{ matrix.build_type }}
-          path: ${{ github.workspace }}/outputs/*.json
 
       - name: Archive and Upload Libtorrent Packages
         id: archive_and_upload
@@ -225,6 +218,13 @@ jobs:
             fi
           done
           echo "archive_processed=true" >> $GITHUB_OUTPUT
+      
+      - name: Upload Package Data
+        if: steps.archive_and_upload.outputs.archive_processed == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: libtorrent-output-${{ matrix.build_type }}
+          path: ${{ github.workspace }}/outputs/*.json
 
       - name: Commit and Push Libtorrent Packages
         if: steps.archive_and_upload.outputs.archive_processed == 'true'
