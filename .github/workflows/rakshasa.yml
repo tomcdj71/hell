@@ -95,7 +95,7 @@ jobs:
           ARCHITECTURE="amd64"
           CURRENT_DATE=$(date +%Y-%m-%d)
           BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "${PACKAGE_NAME}${PACKAGE_SUFFIX}" "$LIBTORRENT_VERSION" "${{ env.CURRENT_LIBTORRENT_PATH }}")
-          FULL_VERSION="${LIBTORRENT_VERSION}-1build${BUILD_NUMBER}"
+          FULL_VERSION="${LIBTORRENT_VERSION}-1${BUILD_NUMBER}"
           COMMIT_MESSAGE="Update libtorrent${PACKAGE_SUFFIX} to v${LIBTORRENT_VERSION} [automated]"
           TMP_DIR=$(mktemp -d)
           TMP_DIR=${TMP_DIR##*tmp.}
