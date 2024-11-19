@@ -19,18 +19,18 @@ jobs:
       max-parallel: 1
       matrix:
         include:
-          - build_type: release
-            libtorrent_package_name: libtorrent21t64
-            libtorrent_dev_package_name: libtorrent-dev
-            libtorrent_version: 0.13.8
-            libtorrent_package_suffix: ""
-            branch_ref: v0.13.8
           - build_type: nightly
             libtorrent_package_name: libtorrent22
             libtorrent_dev_package_name: libtorrent-dev
             libtorrent_version: 0.14.0
             libtorrent_package_suffix: "-nightly"
             branch_ref: master
+          - build_type: release
+            libtorrent_package_name: libtorrent21t64
+            libtorrent_dev_package_name: libtorrent-dev
+            libtorrent_version: 0.13.8
+            libtorrent_package_suffix: ""
+            branch_ref: v0.13.8
 
     env:
       REPO_PATH: "${{ github.workspace }}/binaries"
