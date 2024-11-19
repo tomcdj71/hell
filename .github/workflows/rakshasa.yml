@@ -100,7 +100,8 @@ jobs:
           INSTALL_DIR=$(mktemp -d)
           INSTALL_DIR=${INSTALL_DIR##*tmp.}
           INSTALL_DIR="${{ env.REPO_PATH }}/$INSTALL_DIR"
-          variables=(UPDATE_NEEDED TMP_DIR INSTALL_DIR PACKAGE_NAME DEV_PACKAGE_NAME LIBTORRENT_VERSION FULL_VERSION BUILD_NUMBER COMMIT_MESSAGE CURRENT_DATE BUILD_TYPE PACKAGE_SUFFIX LATEST_COMMIT_SHA ARCHITECTURE)
+          SCRIPTS_PATH="${{ env.SCRIPTS_PATH }}"
+          variables=(UPDATE_NEEDED TMP_DIR INSTALL_DIR PACKAGE_NAME DEV_PACKAGE_NAME LIBTORRENT_VERSION FULL_VERSION BUILD_NUMBER COMMIT_MESSAGE CURRENT_DATE BUILD_TYPE PACKAGE_SUFFIX LATEST_COMMIT_SHA ARCHITECTURE COMMIT_DATE) 
           variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
           for variable in "${variables_sorted[@]}"; do
             lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
@@ -117,7 +118,7 @@ jobs:
           install_dir: ${{ steps.libtorrent_update.outputs.install_dir }}
           build_type: ${{ steps.libtorrent_update.outputs.build_type }}
           LIBTORRENT_VERSION: ${{ steps.libtorrent_update.outputs.libtorrent_version }}
-          SCRIPTS_PATH: ${{ env.SCRIPTS_PATH }}
+          scripts_path: ${{ env.SCRIPTS_PATH }}
         run: |
           set -e
           cd ${{ github.workspace }}/libtorrent-rakshasa
@@ -130,7 +131,7 @@ jobs:
             fi
           fi
           if [ ! -f ./autogen.sh ]; then
-            cp -pR ${{ SCRIPTS_PATH }}/libtorrent-autogen.sh ./autogen.sh
+            cp -pR ${scripts_path}/libtorrent-autogen.sh ./autogen.sh
             chmod +x ./autogen.sh
           fi
           ./autogen.sh
