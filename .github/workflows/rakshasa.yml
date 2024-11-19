@@ -18,9 +18,19 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        build_type:
-          - release
-          - nightly
+        include:
+          - build_type: release
+            libtorrent_package_name: libtorrent21t64
+            libtorrent_dev_package_name: libtorrent-dev
+            libtorrent_version: 0.13.8
+            libtorrent_package_suffix: ""
+            branch_ref: v0.13.8
+          - build_type: nightly
+            libtorrent_package_name: libtorrent22
+            libtorrent_dev_package_name: libtorrent-dev
+            libtorrent_version: 0.14.0
+            libtorrent_package_suffix: "-nightly"
+            branch_ref: master
 
     env:
       REPO_PATH: "${{ github.workspace }}/binaries"
@@ -47,22 +57,14 @@ jobs:
         env:
           build_type: ${{ matrix.build_type }}
           time_diff: ${{ env.TIME_DIFF }}
+          REF: ${{ matrix.branch_ref }}
+          LIBTORRENT_VERSION: ${{ matrix.libtorrent_version }}
+          PACKAGE_SUFFIX: ${{ matrix.libtorrent_package_suffix }}
+          PACKAGE_NAME: ${{ matrix.libtorrent_package_name }}
+          DEV_PACKAGE_NAME: ${{ matrix.libtorrent_dev_package_name }}
         run: |
           set -e
           CURRENT_TIME=$(date +%s)
-          BUILD_TYPE="${build_type}"
-          if [ "$BUILD_TYPE" == "release" ]; then
-            LIBTORRENT_VERSION="0.13.8"
-            PACKAGE_SUFFIX=""
-            REF="v${LIBTORRENT_VERSION}"
-          elif [ "$BUILD_TYPE" == "nightly" ]; then
-            LIBTORRENT_VERSION="0.14.0"
-            PACKAGE_SUFFIX="-nightly"
-            REF="master"
-          else
-            echo "Invalid build type: $BUILD_TYPE"
-            exit 1
-          fi 
           REPO_URL="https://github.com/rakshasa/libtorrent"
           git clone --depth 1 --branch "$REF" "$REPO_URL" ${{ github.workspace }}/libtorrent-rakshasa
           cd ${{ github.workspace }}/libtorrent-rakshasa
@@ -86,12 +88,10 @@ jobs:
             echo "update_needed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-          PACKAGE_NAME="libtorrent22"
-          DEV_PACKAGE_NAME="libtorrent-dev"
           ARCHITECTURE="amd64"
           CURRENT_DATE=$(date +%Y-%m-%d)
-          BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME${PACKAGE_SUFFIX}" "$LIBTORRENT_VERSION" "${{ env.CURRENT_LIBTORRENT_PATH }}")
-          FULL_VERSION="${LIBTORRENT_VERSION}-1${BUILD_NUMBER}"
+          BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "${PACKAGE_NAME}${PACKAGE_SUFFIX}" "$LIBTORRENT_VERSION" "${{ env.CURRENT_LIBTORRENT_PATH }}")
+          FULL_VERSION="${LIBTORRENT_VERSION}-1build${BUILD_NUMBER}"
           COMMIT_MESSAGE="Update libtorrent${PACKAGE_SUFFIX} to v${LIBTORRENT_VERSION} [automated]"
           TMP_DIR=$(mktemp -d)
           TMP_DIR=${TMP_DIR##*tmp.}
@@ -100,7 +100,7 @@ jobs:
           INSTALL_DIR=$(mktemp -d)
           INSTALL_DIR=${INSTALL_DIR##*tmp.}
           INSTALL_DIR="${{ env.REPO_PATH }}/$INSTALL_DIR"
-          variables=(UPDATE_NEEDED TMP_DIR INSTALL_DIR PACKAGE_NAME DEV_PACKAGE_NAME LIBTORRENT_VERSION FULL_VERSION BUILD_NUMBER COMMIT_MESSAGE CURRENT_DATE BUILD_TYPE PACKAGE_SUFFIX LATEST_COMMIT_SHA)
+          variables=(UPDATE_NEEDED TMP_DIR INSTALL_DIR PACKAGE_NAME DEV_PACKAGE_NAME LIBTORRENT_VERSION FULL_VERSION BUILD_NUMBER COMMIT_MESSAGE CURRENT_DATE BUILD_TYPE PACKAGE_SUFFIX LATEST_COMMIT_SHA ARCHITECTURE)
           variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
           for variable in "${variables_sorted[@]}"; do
             lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
@@ -114,21 +114,23 @@ jobs:
         id: libtorrent_build
         if: steps.libtorrent_update.outputs.update_needed == 'true'
         env:
-          install_dir: ${{ steps.libtorrent_update.outputs.INSTALL_DIR }}
-          build_type: ${{ steps.libtorrent_update.outputs.BUILD_TYPE }}
+          install_dir: ${{ steps.libtorrent_update.outputs.install_dir }}
+          build_type: ${{ steps.libtorrent_update.outputs.build_type }}
+          LIBTORRENT_VERSION: ${{ steps.libtorrent_update.outputs.libtorrent_version }}
+          SCRIPTS_PATH: ${{ env.SCRIPTS_PATH }}
         run: |
           set -e
           cd ${{ github.workspace }}/libtorrent-rakshasa
           if [ "$build_type" == "release" ]; then
             if [ -d "${{ env.REPO_PATH }}/patches/libtorrent-rakshasa" ]; then
-              for patch in ${{ env.REPO_PATH }}/patches/libtorrent-rakshasa/*0.13.8.patch; do
+              for patch in ${{ env.REPO_PATH }}/patches/libtorrent-rakshasa/*${LIBTORRENT_VERSION}.patch; do
                 echo "Applying patch $patch"
                 patch -p1 --fuzz=3 --ignore-whitespace --verbose < "$patch"
               done
             fi
           fi
           if [ ! -f ./autogen.sh ]; then
-            cp -pR ${{ env.SCRIPTS_PATH }}/libtorrent-autogen.sh ./autogen.sh
+            cp -pR ${{ SCRIPTS_PATH }}/libtorrent-autogen.sh ./autogen.sh
             chmod +x ./autogen.sh
           fi
           ./autogen.sh
@@ -146,18 +148,21 @@ jobs:
         id: generate_deb_files
         if: steps.libtorrent_build.outputs.libtorrent_compiled == 'true'
         env:
-          full_version: ${{ steps.libtorrent_update.outputs.FULL_VERSION }}
-          package_suffix: ${{ steps.libtorrent_update.outputs.PACKAGE_SUFFIX }}
-          current_date: ${{ steps.libtorrent_update.outputs.CURRENT_DATE }}
-          install_dir: ${{ steps.libtorrent_update.outputs.INSTALL_DIR }}
-          tmp_dir: ${{ steps.libtorrent_update.outputs.TMP_DIR }}
+          full_version: ${{ steps.libtorrent_update.outputs.full_version }}
+          package_suffix: ${{ steps.libtorrent_update.outputs.package_suffix }}
+          current_date: ${{ steps.libtorrent_update.outputs.current_date }}
+          install_dir: ${{ steps.libtorrent_update.outputs.install_dir }}
+          tmp_dir: ${{ steps.libtorrent_update.outputs.tmp_dir }}
           pool_path: ${{ env.POOL_PATH }}
           scripts_path: ${{ env.SCRIPTS_PATH }}
           output_dir: ${{ github.workspace }}/outputs
+          PACKAGE_NAME: ${{ steps.libtorrent_update.outputs.package_name }}
+          DEV_PACKAGE_NAME: ${{ steps.libtorrent_update.outputs.dev_package_name }}
+          ARCHITECTURE: ${{ steps.libtorrent_update.outputs.architecture }}
         run: |
           set -e
           mkdir -p "${output_dir}"
-          PACKAGE_NAMES=("libtorrent22" "libtorrent-dev")
+          PACKAGE_NAMES=("${PACKAGE_NAME}" "${DEV_PACKAGE_NAME}")
           for PACKAGE in "${PACKAGE_NAMES[@]}"; do
             PACKAGE_NAME="${PACKAGE}"
             PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
@@ -171,9 +176,9 @@ jobs:
               "${full_version}" \
               "${current_date}" \
               "${pool_path}" \
-              "${package_suffix}" 
-            ORIGINAL_PACKAGE_FILE="${PACKAGE_NAME}_${full_version}_amd64.deb"
-            NEW_PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_amd64.deb"
+              "${package_suffix}"
+            ORIGINAL_PACKAGE_FILE="${PACKAGE_NAME}_${full_version}_${ARCHITECTURE}.deb"
+            NEW_PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_${ARCHITECTURE}.deb"
             if [ "${ORIGINAL_PACKAGE_FILE}" != "${NEW_PACKAGE_FILE}" ]; then
               mv "${pool_path}/${ORIGINAL_PACKAGE_FILE}" "${pool_path}/${NEW_PACKAGE_FILE}"
             fi
@@ -195,20 +200,21 @@ jobs:
         id: archive_and_upload
         if: steps.generate_deb_files.outputs.libtorrent_packaged == 'true'
         env:
-          full_version: ${{ steps.libtorrent_update.outputs.FULL_VERSION }}
+          full_version: ${{ steps.libtorrent_update.outputs.full_version }}
           package_names: |
-            libtorrent22
-            libtorrent-dev
-          package_suffix: ${{ steps.libtorrent_update.outputs.PACKAGE_SUFFIX }}
+            ${{ steps.libtorrent_update.outputs.package_name }}
+            ${{ steps.libtorrent_update.outputs.dev_package_name }}
+          package_suffix: ${{ steps.libtorrent_update.outputs.package_suffix }}
           pool_path: ${{ env.POOL_PATH }}
           current_libtorrent_path: ${{ env.CURRENT_LIBTORRENT_PATH }}
           archive_libtorrent_path: ${{ env.ARCHIVE_LIBTORRENT_PATH }}
           scripts_path: ${{ env.SCRIPTS_PATH }}
+          ARCHITECTURE: ${{ steps.libtorrent_update.outputs.architecture }}
         run: |
           set -e
           for PACKAGE in $package_names; do
             PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
-            PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_amd64.deb"
+            PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_${ARCHITECTURE}.deb"
             if [ -f "${pool_path}/${PACKAGE_FILE}" ]; then
               bash "${scripts_path}/archive_packages.sh" \
                 "${current_libtorrent_path}" \
@@ -217,9 +223,9 @@ jobs:
             else
               echo "Package ${PACKAGE_FILE} not found in ${pool_path}"
             fi
-          done 
+          done
           echo "archive_processed=true" >> $GITHUB_OUTPUT
-      
+
       - name: Upload Package Data
         if: steps.archive_and_upload.outputs.archive_processed == 'true'
         uses: actions/upload-artifact@v3
@@ -231,7 +237,7 @@ jobs:
         if: steps.archive_and_upload.outputs.archive_processed == 'true'
         uses: EndBug/add-and-commit@v9
         env:
-          commit_message: ${{ steps.libtorrent_update.outputs.COMMIT_MESSAGE }}
+          commit_message: ${{ steps.libtorrent_update.outputs.commit_message }}
           author_email: "${{ secrets.COMMITER_EMAIL }}"
           author_name: "${{ secrets.COMMITER_NAME }}"
         with:
@@ -255,7 +261,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          path: ${{ env.REPO_PATH }}
+          path: ${{ github.workspace }}/binaries
 
       - name: Download Package Data
         uses: actions/download-artifact@v3
