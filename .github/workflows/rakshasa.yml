@@ -270,6 +270,7 @@ jobs:
           path: ${{ github.workspace }}/outputs
 
       - name: Collect Outputs
+        id: collect_outputs
         run: |
           set -e
           output_dir="${{ github.workspace }}/outputs"
@@ -280,6 +281,9 @@ jobs:
             manifest_updates=$(echo "${manifest_updates}" | jq ".package_updates += {\"${package_name}\": ${package_data}}")
           done
           echo "${manifest_updates}" > "${output_dir}/manifest_updates.json"
+          echo "manifest_updates<<EOF" >> $GITHUB_OUTPUT
+          echo "${manifest_updates}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Trigger Update Manifest Workflow
         uses: peter-evans/repository-dispatch@v3
