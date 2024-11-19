@@ -86,7 +86,7 @@ jobs:
             echo "update_needed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-          PACKAGE_NAME="libtorrent21t64"
+          PACKAGE_NAME="libtorrent22"
           DEV_PACKAGE_NAME="libtorrent-dev"
           ARCHITECTURE="amd64"
           CURRENT_DATE=$(date +%Y-%m-%d)
@@ -157,7 +157,7 @@ jobs:
         run: |
           set -e
           mkdir -p "${output_dir}"
-          PACKAGE_NAMES=("libtorrent21t64" "libtorrent-dev")
+          PACKAGE_NAMES=("libtorrent22" "libtorrent-dev")
           for PACKAGE in "${PACKAGE_NAMES[@]}"; do
             PACKAGE_NAME="${PACKAGE}"
             PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
@@ -197,7 +197,7 @@ jobs:
         env:
           full_version: ${{ steps.libtorrent_update.outputs.FULL_VERSION }}
           package_names: |
-            libtorrent21t64
+            libtorrent22
             libtorrent-dev
           package_suffix: ${{ steps.libtorrent_update.outputs.PACKAGE_SUFFIX }}
           pool_path: ${{ env.POOL_PATH }}

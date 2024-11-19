@@ -77,15 +77,15 @@ if [ "$PACKAGE_NAME" == "libtorrent-rasterbar-dev" ]; then
 elif [ "$PACKAGE_NAME" == "python3-libtorrent" ]; then
   echo "Modifying 'Depends' field for $PACKAGE_NAME"
   sed -i "s/^\(Depends:.*libtorrent-rasterbar2.*(>=\s*\)[^)]*\()\)/\1$FULL_VERSION\2/" "$control_file"
-elif [ "$PACKAGE_NAME" == "libtorrent21t64" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
+elif [ "$PACKAGE_NAME" == "libtorrent22" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
   echo "Modifying control fields for $PACKAGE_NAME"
   sed -i "s/^Package: .*/Package: libtorrent/" "$control_file"
   sed -i "s/^Provides: .*/Provides: libtorrent (= $FULL_VERSION)/" "$control_file"
-  sed -i "s/^Breaks: .*/Breaks: libtorrent21t64 (<< $FULL_VERSION), libtorrent21 (<< $FULL_VERSION)/" "$control_file"
-  sed -i "s/^Replaces: .*/Replaces: libtorrent21t64/" "$control_file"
+  sed -i "s/^Breaks: .*/Breaks: libtorrent22 (<< $FULL_VERSION), libtorrent21 (<< $FULL_VERSION)/" "$control_file"
+  sed -i "s/^Replaces: .*/Replaces: libtorrent22/" "$control_file"
 elif [ "$PACKAGE_NAME" == "libtorrent-dev" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
     echo "Modifying field for $PACKAGE_NAME$PACKAGE_SUFFIX"
-    sed -i "s/libtorrent21t64/libtorrent/g" "$control_file"
+    sed -i "s/libtorrent22/libtorrent/g" "$control_file"
 fi
 current_version=$(grep "^Version:" "$control_file" | awk '{print $2}')
 sed -i "s/$current_version/$FULL_VERSION/g" "$control_file"
@@ -135,9 +135,14 @@ if [ "$NO_CHECK" = false ]; then
   echo "Performing rsync to merge installation files..."
   rsync -auv --existing "$INSTALL_DIR/" "./"
   if [ "$PACKAGE_NAME" == "libtorrent-dev" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
-    LIBTORRENT_PC_PATH="$(find . -name libtorrent.pc)"
-    cp "$INSTALL_DIR/usr/lib/pkgconfig/libtorrent.pc" "$LIBTORRENT_PC_PATH"
-    echo "Editing libtorrent.pc file to change the version to $FULL_VERSION"
+    rm -rf usr/lib/x86_64-linux-gnu/*
+    cp -pR "$INSTALL_DIR/usr/lib/x86_64-linux-gnu/libtorrent.so*" usr/lib/x86_64-linux-gnu/
+    sed -i "s/^Version: .*/Version: 0.14.0/" "usr/lib/x86_64-linux-gnu/pkgconfig/libtorrent.pc"
+  elif [ "$PACKAGE_NAME" == "libtorrent22" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
+    rm -rf usr/lib/x86_64-linux-gnu/*
+    rm -rf usr/include/*
+    cp -pR "$INSTALL_DIR/usr/include/*" usr/include/
+    cp -pR "$INSTALL_DIR/usr/lib/x86_64-linux-gnu/*" usr/lib/x86_64-linux-gnu/
     sed -i "s/^Version: .*/Version: 0.14.0/" "$LIBTORRENT_PC_PATH"
   fi
   installed_size=$(du -sk . | cut -f1)
