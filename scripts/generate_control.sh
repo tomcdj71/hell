@@ -136,7 +136,7 @@ if [ "$NO_CHECK" = false ]; then
   rsync -auv --existing "$INSTALL_DIR/" "./"
   if [ "$PACKAGE_NAME" == "libtorrent-dev" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
     LIBTORRENT_PC_PATH="$(find . -name libtorrent.pc)"
-    cp "$INSTALL_DIR/usr/lib/x86_64-linux-gnu/pkgconfig/libtorrent.pc" "$LIBTORRENT_PC_PATH"
+    cp "$INSTALL_DIR/usr/lib/pkgconfig/libtorrent.pc" "$LIBTORRENT_PC_PATH"
     echo "Editing libtorrent.pc file to change the version to $FULL_VERSION"
     sed -i "s/^Version: .*/Version: 0.14.0/" "$LIBTORRENT_PC_PATH"
   fi

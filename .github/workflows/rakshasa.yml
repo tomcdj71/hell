@@ -171,7 +171,7 @@ jobs:
               "${full_version}" \
               "${current_date}" \
               "${pool_path}" \
-              "${package_suffix}"
+              "${package_suffix}" 
             ORIGINAL_PACKAGE_FILE="${PACKAGE_NAME}_${full_version}_amd64.deb"
             NEW_PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_amd64.deb"
             if [ "${ORIGINAL_PACKAGE_FILE}" != "${NEW_PACKAGE_FILE}" ]; then
