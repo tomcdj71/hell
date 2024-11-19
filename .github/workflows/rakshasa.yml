@@ -41,6 +41,10 @@ jobs:
       TIME_DIFF: 480000  # hours
 
     steps:
+      - name: Update packages
+        run: |
+          sudo apt-get update --fix-missing
+
       - uses: tecolicom/actions-use-apt-tools@v1
         with:
           tools: build-essential autoconf automake libtool pkg-config cmake git libssl-dev libcurl4-openssl-dev libsigc++-2.0-dev libncurses5-dev libncursesw5-dev libtool intltool checkinstall jq
