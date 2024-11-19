@@ -188,7 +188,6 @@ jobs:
               \"category\": \"libtorrent\",
               \"build_date\": \"${current_date}\"
             }" > "${output_dir}/${PACKAGE_FILE_NAME}.json"
-          done
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
       
       - name: Upload Package Data
