@@ -169,7 +169,12 @@ jobs:
             PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
             cd "${tmp_dir}"
             sudo apt-get update
-            apt-get download "${PACKAGE_NAME}"
+            # if package_name is libtorrent22, download libtorrent21t64 instead
+            if [ "${PACKAGE_NAME}" == "libtorrent22" ]; then
+              apt-get download "libtorrent21t64"
+            else
+              apt-get download "${PACKAGE_NAME}"
+            fi
             bash "${scripts_path}/generate_control.sh" \
               "${PACKAGE_NAME}" \
               "${install_dir}" \

@@ -44,7 +44,11 @@ echo "=================="
 
 # Find the correct package file
 echo "Attempting to find package file matching: ${PACKAGE_NAME}"
-PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}*" -print -quit)
+if  [ "$PACKAGE_NAME" == "libtorrent22" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
+  PACKAGE_FILE=$(find "$TMPDIR" -type f -name "libtorrent21t64" -print -quit)
+else
+  PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}*" -print -quit)
+fi
 
 if [ -z "$PACKAGE_FILE" ]; then
   echo "Error: Package file for $PACKAGE_NAME not found in $TMPDIR"
