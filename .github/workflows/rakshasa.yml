@@ -216,7 +216,7 @@ jobs:
             else
               echo "Package ${PACKAGE_FILE} not found in ${pool_path}"
             fi
-          done
+          done 
           echo "archive_processed=true" >> $GITHUB_OUTPUT
       
       - name: Upload Package Data

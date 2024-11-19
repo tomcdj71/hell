@@ -133,9 +133,14 @@ if [ "$NO_CHECK" = false ]; then
   echo "Performing rsync to merge installation files..."
   rsync -auv --existing "$INSTALL_DIR/" "./"
   if [ "$PACKAGE_NAME" == "libtorrent-dev-nightly" ]; then
-    echo "Editing /usr/lib/x86_64-linux-gnu/pkgconfig/libtorrent.pc file to change the version to 0.14.0"
-    find . -type f -name "libtorrent.pc" -exec sed -i "s/^Version: .*/Version: 0.14.0/" {} \;
+  LIBTORRENT_PC_PATH="$(find . -name libtorrent.pc)"
+  if [ ! -f "$LIBTORRENT_PC_PATH" ]; then
+    echo "libtorrent.pc does not exist in the package. Copying it over."
+    cp "$INSTALL_DIR/usr/lib/x86_64-linux-gnu/pkgconfig/libtorrent.pc" "$LIBTORRENT_PC_PATH"
   fi
+  echo "Editing libtorrent.pc file to change the version to $FULL_VERSION"
+  sed -i "s/^Version: .*/Version: 0.14.0/" "$LIBTORRENT_PC_PATH"
+fi
   installed_size=$(du -sk . | cut -f1)
   echo "Old Installed-Size: $old_installed_size kB"
   echo "New Installed-Size: $installed_size kB"
