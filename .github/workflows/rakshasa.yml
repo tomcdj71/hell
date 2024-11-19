@@ -289,4 +289,4 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           event-type: update-manifest
-          client-payload: ${{ toJSON(fromJson(file('${{ github.workspace }}/outputs/manifest_updates.json'))) }}
+          client-payload: ${{ steps.collect_outputs.outputs.manifest_updates }}
