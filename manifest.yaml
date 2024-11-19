@@ -169,7 +169,7 @@ packages:
     - bookworm
   libtorrent-dev:
     version: 0.13.8-1build1
-    checksum_sha256: 3c9fab93fb9aa28415942f0f10751a62a9aeb6d3605942cac8b1b772b11cb7a0
+    checksum_sha256: 6ffd00404f850b191e18fef35f7d4f0ce81291f27a49f482e2090e719695d42b
     category: libtorrent
     build_date: '2024-11-19'
     distribution:
@@ -182,8 +182,8 @@ packages:
     distribution:
     - bookworm
   libtorrent-dev-nightly:
-    version: 0.14.0-1build1
-    checksum_sha256: 9b0b85cd0d5188b8f7dff50fc4074a217ced1ca19df77ec15c4a93d8d394ddb7
+    version: 0.14.0-1build2
+    checksum_sha256: 5e6da49ed7084ad62a7d4ba88b8f2dc3819b21f08aa385cd09695770c162eedb
     category: libtorrent
     build_date: '2024-11-19'
     distribution:
