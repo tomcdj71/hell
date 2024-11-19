@@ -59,7 +59,7 @@ if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
     echo "Error: LOCAL_PACKAGE_PATH is not set for $PACKAGE_NAME"
     exit 1
   fi
-elif [[ "$PACKAGE_NAME" == "libtorrent-dev" ]] && [[ "$FULL_VERSION" > "0.13.8" ]]; then
+elif [[ "$PACKAGE_NAME" == "libtorrent-dev" && "$FULL_VERSION" > "0.13.9" ]]; then
   if [ -n "$LOCAL_PACKAGE_PATH" ]; then
     echo "Using local package files for $PACKAGE_NAME"
     PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}_*.deb" -not -name "*0.13.8*" -print -quit)
