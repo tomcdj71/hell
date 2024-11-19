@@ -23,6 +23,7 @@ FULL_VERSION="$4"
 CURRENT_DATE="$5"
 POOL_PATH="$6"
 PACKAGE_SUFFIX="$7"
+LOCAL_PACKAGE_PATH="$8"
 PACKAGE_DIR="${TMPDIR}/package/${PACKAGE_NAME}"
 USERNAME=$(whoami)
 
@@ -40,22 +41,47 @@ echo "POOL_PATH: $POOL_PATH"
 echo "PACKAGE_DIR: $PACKAGE_DIR"
 echo "NO_CHECK: $NO_CHECK"
 echo "PACKAGE_SUFFIX: $PACKAGE_SUFFIX"
+echo "LOCAL_PACKAGE_PATH: $LOCAL_PACKAGE_PATH"
 echo "=================="
 
 # Find the correct package file
-echo "Attempting to find package file matching: ${PACKAGE_NAME}"
-if  [ "$PACKAGE_NAME" == "libtorrent22" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
-  PACKAGE_FILE=$(find "$TMPDIR" -type f -name "libtorrent21t64" -print -quit)
+if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
+  if [ -n "$LOCAL_PACKAGE_PATH" ]; then
+    echo "Using local package files for $PACKAGE_NAME"
+    PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}_*.deb" -print -quit)
+    if [ -z "$PACKAGE_FILE" ]; then
+      echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
+      exit 1
+    fi
+    cp "$PACKAGE_FILE" "$TMPDIR/"
+    PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
+  else
+    echo "Error: LOCAL_PACKAGE_PATH is not set for $PACKAGE_NAME"
+    exit 1
+  fi
+elif [[ "$PACKAGE_NAME" == "libtorrent-dev" ]] && [[ "$FULL_VERSION" > "0.13.8" ]]; then
+  if [ -n "$LOCAL_PACKAGE_PATH" ]; then
+    echo "Using local package files for $PACKAGE_NAME"
+    PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}_*.deb" -not -name "*0.13.8*" -print -quit)
+    if [ -z "$PACKAGE_FILE" ]; then
+      echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
+      exit 1
+    fi
+    cp "$PACKAGE_FILE" "$TMPDIR/"
+    PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
+  else
+    echo "Error: LOCAL_PACKAGE_PATH is not set for $PACKAGE_NAME"
+    exit 1
+  fi
 else
-  PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}*" -print -quit)
-fi
-
-if [ -z "$PACKAGE_FILE" ]; then
-  echo "Error: Package file for $PACKAGE_NAME not found in $TMPDIR"
-  echo "Contents of TMPDIR:"
-  tree -L 2 "$TMPDIR"
-  echo "Exiting with error."
-  exit 1
+  PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}*.deb" -print -quit)
+  if [ -z "$PACKAGE_FILE" ]; then
+    echo "Error: Package file for $PACKAGE_NAME not found in $TMPDIR"
+    echo "Contents of TMPDIR:"
+    tree -L 2 "$TMPDIR"
+    echo "Exiting with error."
+    exit 1
+  fi
 fi
 
 PACKAGE_FILE=$(basename "$PACKAGE_FILE")
@@ -70,9 +96,6 @@ sudo dpkg -e "$TMPDIR/$PACKAGE_FILE" "$PACKAGE_DIR/DEBIAN" || {
 sudo chown -R "$USERNAME:$USERNAME" "$PACKAGE_DIR"
 
 control_file="$PACKAGE_DIR/DEBIAN/control"
-COPYRIGHT=" .
-  Packaged by MediaEase on $CURRENT_DATE."
-echo "$COPYRIGHT" >> "$control_file"
 
 # Modify the 'Depends' field to lock to current version
 if [ "$PACKAGE_NAME" == "libtorrent-rasterbar-dev" ]; then
@@ -81,19 +104,9 @@ if [ "$PACKAGE_NAME" == "libtorrent-rasterbar-dev" ]; then
 elif [ "$PACKAGE_NAME" == "python3-libtorrent" ]; then
   echo "Modifying 'Depends' field for $PACKAGE_NAME"
   sed -i "s/^\(Depends:.*libtorrent-rasterbar2.*(>=\s*\)[^)]*\()\)/\1$FULL_VERSION\2/" "$control_file"
-elif [ "$PACKAGE_NAME" == "libtorrent22" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
-  echo "Modifying control fields for $PACKAGE_NAME"
-  sed -i "s/^Package: .*/Package: libtorrent/" "$control_file"
-  sed -i "s/^Provides: .*/Provides: libtorrent (= $FULL_VERSION)/" "$control_file"
-  sed -i "s/^Breaks: .*/Breaks: libtorrent22 (<< $FULL_VERSION), libtorrent21 (<< $FULL_VERSION)/" "$control_file"
-  sed -i "s/^Replaces: .*/Replaces: libtorrent22/" "$control_file"
-elif [ "$PACKAGE_NAME" == "libtorrent-dev" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
-    echo "Modifying field for $PACKAGE_NAME$PACKAGE_SUFFIX"
-    sed -i "s/libtorrent22/libtorrent/g" "$control_file"
 fi
 current_version=$(grep "^Version:" "$control_file" | awk '{print $2}')
 sed -i "s/$current_version/$FULL_VERSION/g" "$control_file"
-# Reordering the Description field in the control file
 echo "Reordering Description field in \"$control_file\""
 desc_file="${control_file}.description"
 tmp_file="${control_file}.tmp"
@@ -113,6 +126,13 @@ in_desc==0 { print > tmp_file }
 mv "$tmp_file" "$control_file"
 cat "$desc_file" >> "$control_file"
 rm -f "$desc_file"
+
+COPYRIGHT=" Packaged by MediaEase on $CURRENT_DATE."
+if ! grep -q "Packaged by MediaEase" "$control_file"; then
+  echo "Adding copyright"
+  echo " ." >> "$control_file"
+  echo "$COPYRIGHT" >> "$control_file"
+fi
 
 echo "Contents of \"$control_file\" after modification:"
 cat "$control_file"
@@ -138,17 +158,6 @@ if [ "$NO_CHECK" = false ]; then
   old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
   echo "Performing rsync to merge installation files..."
   rsync -auv --existing "$INSTALL_DIR/" "./"
-  if [ "$PACKAGE_NAME" == "libtorrent-dev" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
-    rm -rf usr/lib/x86_64-linux-gnu/*
-    cp -pR "$INSTALL_DIR/usr/lib/x86_64-linux-gnu/libtorrent.so*" usr/lib/x86_64-linux-gnu/
-    sed -i "s/^Version: .*/Version: 0.14.0/" "usr/lib/x86_64-linux-gnu/pkgconfig/libtorrent.pc"
-  elif [ "$PACKAGE_NAME" == "libtorrent22" ] && [ "$PACKAGE_SUFFIX" == "-nightly" ]; then
-    rm -rf usr/lib/x86_64-linux-gnu/*
-    rm -rf usr/include/*
-    cp -pR "$INSTALL_DIR/usr/include/*" usr/include/
-    cp -pR "$INSTALL_DIR/usr/lib/x86_64-linux-gnu/*" usr/lib/x86_64-linux-gnu/
-    sed -i "s/^Version: .*/Version: 0.14.0/" "$LIBTORRENT_PC_PATH"
-  fi
   installed_size=$(du -sk . | cut -f1)
   echo "Old Installed-Size: $old_installed_size kB"
   echo "New Installed-Size: $installed_size kB"

@@ -169,10 +169,7 @@ jobs:
             PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
             cd "${tmp_dir}"
             sudo apt-get update
-            # if package_name is libtorrent22, download libtorrent21t64 instead
-            if [ "${PACKAGE_NAME}" == "libtorrent22" ]; then
-              apt-get download "libtorrent21t64"
-            else
+            if [ "${package_suffix}" != "-nightly" ]; then
               apt-get download "${PACKAGE_NAME}"
             fi
             bash "${scripts_path}/generate_control.sh" \
@@ -182,7 +179,8 @@ jobs:
               "${full_version}" \
               "${current_date}" \
               "${pool_path}" \
-              "${package_suffix}"
+              "${package_suffix}" \
+              "${LOCAL_PACKAGE_PATH}"
             ORIGINAL_PACKAGE_FILE="${PACKAGE_NAME}_${full_version}_${ARCHITECTURE}.deb"
             NEW_PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_${ARCHITECTURE}.deb"
             if [ "${ORIGINAL_PACKAGE_FILE}" != "${NEW_PACKAGE_FILE}" ]; then
