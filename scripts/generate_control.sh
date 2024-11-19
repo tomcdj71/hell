@@ -46,33 +46,23 @@ echo "=================="
 
 # Find the correct package file
 if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
-  if [ -n "$LOCAL_PACKAGE_PATH" ]; then
-    echo "Using local package files for $PACKAGE_NAME"
-    PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}_*.deb" -print -quit)
-    if [ -z "$PACKAGE_FILE" ]; then
-      echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
-      exit 1
-    fi
-    cp "$PACKAGE_FILE" "$TMPDIR/"
-    PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
-  else
-    echo "Error: LOCAL_PACKAGE_PATH is not set for $PACKAGE_NAME"
+  echo "Using local package files for $PACKAGE_NAME"
+  PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*.deb" -print -quit)
+  if [ -z "$PACKAGE_FILE" ]; then
+    echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
     exit 1
   fi
+  cp "$PACKAGE_FILE" "$TMPDIR/"
+    PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
 elif [[ "$PACKAGE_NAME" == "libtorrent-dev" && "$FULL_VERSION" > "0.13.9" ]]; then
-  if [ -n "$LOCAL_PACKAGE_PATH" ]; then
-    echo "Using local package files for $PACKAGE_NAME"
-    PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}_*.deb" -not -name "*0.13.8*" -print -quit)
-    if [ -z "$PACKAGE_FILE" ]; then
-      echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
-      exit 1
-    fi
-    cp "$PACKAGE_FILE" "$TMPDIR/"
-    PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
-  else
-    echo "Error: LOCAL_PACKAGE_PATH is not set for $PACKAGE_NAME"
+  echo "Using local package files for $PACKAGE_NAME"
+  PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}_*.deb" -not -name "*0.13.8*" -print -quit)
+  if [ -z "$PACKAGE_FILE" ]; then
+    echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
     exit 1
   fi
+  cp "$PACKAGE_FILE" "$TMPDIR/"
+  PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
 else
   PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}*.deb" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
