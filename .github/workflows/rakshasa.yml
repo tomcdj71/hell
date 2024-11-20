@@ -231,7 +231,7 @@ jobs:
                 "${pool_path}/${PACKAGE_FILE}"
             else
               echo "Package ${PACKAGE_FILE} not found in ${pool_path}"
-            fi
+            fi 
           done
           echo "archive_processed=true" >> $GITHUB_OUTPUT
 
