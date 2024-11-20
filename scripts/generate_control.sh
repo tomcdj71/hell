@@ -46,7 +46,7 @@ echo "LOCAL_PACKAGE_PATH: $LOCAL_PACKAGE_PATH"
 echo "=================="
 
 # Find the correct package file
-if [[ "$PACKAGE_NAME" == "libtorrent22" && "$PACKAGE_SUFFIX" == "-nightly" ]]; then
+if [[ "$PACKAGE_NAME" == "libtorrent22" ]]; then
   echo "Using local package files for $PACKAGE_NAME"
   PACKAGE_NAME="${PACKAGE_NAME}${PACKAGE_SUFFIX}"
   PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*" -print -quit)
