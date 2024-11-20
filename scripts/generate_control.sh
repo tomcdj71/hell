@@ -54,9 +54,10 @@ if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
   fi
   cp "$PACKAGE_FILE" "$TMPDIR/"
     PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
-elif [[ "$PACKAGE_NAME" == "libtorrent-dev" && "$FULL_VERSION" > "0.13.9" ]]; then
+elif [[ "$PACKAGE_NAME" == "libtorrent-dev" && "$PACKAGE_SUFFIX" == "-nightly" ]]; then
   echo "Using local package files for $PACKAGE_NAME"
-  PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}-nightly*.deb" -print -quit)
+  PACKAGE_NAME="${PACKAGE_NAME}${PACKAGE_SUFFIX}"
+  PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
     echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
     exit 1
