@@ -195,7 +195,7 @@ jobs:
             package_var=$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g' | sed 's/_nightly//')
             echo "${package_var}_checksum=${CHECKSUM}" >> $GITHUB_OUTPUT
             echo "${package_var}_file=${NEW_PACKAGE_FILE}" >> $GITHUB_OUTPUT
-          done 
+          done
           echo "{
               \"package_name\": \"${PACKAGE_FILE_NAME}\",
               \"checksum\": \"${CHECKSUM}\",
