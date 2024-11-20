@@ -188,19 +188,21 @@ jobs:
               "${LOCAL_PACKAGE_PATH}"
             echo "build manifest-update file"
             checksum_file="$(find "${tmp_dir}/checksums" -name "*.sha256")"
+            echo "checksum file"
+            cat "${checksum_file}"
             checksum="$(echo "${checksum_file}" | awk '{ print $2 }')"
             package_var="$(echo "${checksum_file}" | awk '{ print $1 }')"
             echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
             echo "${package_var}_name=${package_var}" >> $GITHUB_OUTPUT
             echo "build json file"
-            touch "${output_dir}/${PACKAGE_FILE_NAME}.json"
+            touch "${tmp_dir}/${PACKAGE_FILE_NAME}.json"
             echo "{
                 \"package_name\": \"${package_var}\",
                 \"checksum\": \"${checksum}\",
                 \"version\": \"${full_version}\",
                 \"category\": \"libtorrent\",
                 \"build_date\": \"${current_date}\"
-              }" >> "${output_dir}/${PACKAGE_FILE_NAME}.json"
+              }" >> "${tmp_dir}/${PACKAGE_FILE_NAME}.json"
           done 
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
