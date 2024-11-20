@@ -60,6 +60,7 @@ elif [[ "$PACKAGE_NAME" == "libtorrent-dev" && "$PACKAGE_SUFFIX" == "-nightly" ]
   PACKAGE_NAME="${PACKAGE_NAME}${PACKAGE_SUFFIX}"
   PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
+    tree -L 3 $LOCAL_PACKAGE_PATH
     echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
     exit 1
   fi
