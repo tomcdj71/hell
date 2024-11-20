@@ -25,6 +25,7 @@ CURRENT_DATE="$5"
 POOL_PATH="$6"
 PACKAGE_SUFFIX="$7"
 LOCAL_PACKAGE_PATH="${8:-}"
+PACKAGE_NAME_WITH_SUFFIX="${PACKAGE_NAME}${PACKAGE_SUFFIX}"
 PACKAGE_DIR="${TMPDIR}/package/${PACKAGE_NAME}"
 USERNAME=$(whoami)
 
@@ -34,6 +35,8 @@ mkdir -p "$PACKAGE_DIR/DEBIAN"
 echo "Debug Information:"
 echo "=================="
 echo "PACKAGE_NAME: $PACKAGE_NAME"
+echo "PACKAGE_SUFFIX: $PACKAGE_SUFFIX"
+echo "PACKAGE_NAME_WITH_SUFFIX: $PACKAGE_NAME_WITH_SUFFIX"
 echo "INSTALL_DIR: $INSTALL_DIR"
 echo "TMPDIR: $TMPDIR"
 echo "FULL_VERSION: $FULL_VERSION"
@@ -41,35 +44,22 @@ echo "CURRENT_DATE: $CURRENT_DATE"
 echo "POOL_PATH: $POOL_PATH"
 echo "PACKAGE_DIR: $PACKAGE_DIR"
 echo "NO_CHECK: $NO_CHECK"
-echo "PACKAGE_SUFFIX: $PACKAGE_SUFFIX"
 echo "LOCAL_PACKAGE_PATH: $LOCAL_PACKAGE_PATH"
 echo "=================="
 
 # Find the correct package file
-if [[ "$PACKAGE_NAME" == "libtorrent22" ]]; then
-  echo "Using local package files for $PACKAGE_NAME"
-  PACKAGE_NAME="${PACKAGE_NAME}${PACKAGE_SUFFIX}"
-  PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*" -print -quit)
+if [[ "$PACKAGE_NAME" == "libtorrent22" || ("$PACKAGE_NAME" == "libtorrent-dev" && "$PACKAGE_SUFFIX" == "-nightly") ]]; then
+  echo "Using local package files for $PACKAGE_NAME_WITH_SUFFIX"
+  PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME_WITH_SUFFIX}*.deb" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
-    tree -L 3 $LOCAL_PACKAGE_PATH
-    echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
-    exit 1
-  fi
-  cp "$PACKAGE_FILE" "$TMPDIR/"
-    PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
-elif [[ "$PACKAGE_NAME" == "libtorrent-dev" && "$PACKAGE_SUFFIX" == "-nightly" ]]; then
-  echo "Using local package files for $PACKAGE_NAME"
-  PACKAGE_NAME="${PACKAGE_NAME}${PACKAGE_SUFFIX}"
-  PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*" -print -quit)
-  if [ -z "$PACKAGE_FILE" ]; then
-    tree -L 3 $LOCAL_PACKAGE_PATH
-    echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
+    tree -L 3 "$LOCAL_PACKAGE_PATH"
+    echo "Error: Local package file for $PACKAGE_NAME_WITH_SUFFIX not found in $LOCAL_PACKAGE_PATH"
     exit 1
   fi
   cp "$PACKAGE_FILE" "$TMPDIR/"
   PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
 else
-  PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}*.deb" -print -quit)
+  PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}_*.deb" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
     echo "Error: Package file for $PACKAGE_NAME not found in $TMPDIR"
     echo "Contents of TMPDIR:"
@@ -164,9 +154,9 @@ fi
 cd - > /dev/null
 
 # Build the package
-PACKAGE_FILE_BUILT="${PACKAGE_NAME}_${FULL_VERSION}_amd64.deb"
+PACKAGE_FILE_BUILT="${PACKAGE_NAME_WITH_SUFFIX}_${FULL_VERSION}_amd64.deb"
 dpkg-deb --build "$PACKAGE_DIR" "$PACKAGE_FILE_BUILT" || {
-  echo "Error building package: $PACKAGE_NAME"
+  echo "Error building package: $PACKAGE_NAME_WITH_SUFFIX"
   exit 1
 }
 
@@ -186,9 +176,9 @@ echo "Checksum for $PACKAGE_NAME: $CHECKSUM"
 
 # Write the checksum to a file
 mkdir -p "$TMPDIR/checksums"
-echo "$CHECKSUM" > "$TMPDIR/checksums/${PACKAGE_NAME}.sha256"
-PACKAGE_NAME_CHECKSUM=$(cat "$TMPDIR/checksums/${PACKAGE_NAME}.sha256")
-echo "Checksum written to $TMPDIR/checksums/${PACKAGE_NAME}.sha256"
-echo "Checksum for $PACKAGE_NAME: $PACKAGE_NAME_CHECKSUM"
-echo "Completed processing and packaging for $PACKAGE_NAME"
+echo "$CHECKSUM" > "$TMPDIR/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
+PACKAGE_NAME_CHECKSUM=$(cat "$TMPDIR/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256")
+echo "Checksum written to $TMPDIR/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
+echo "Checksum for $PACKAGE_NAME_WITH_SUFFIX: $PACKAGE_NAME_CHECKSUM"
+echo "Completed processing and packaging for $PACKAGE_NAME_WITH_SUFFIX"
 export PACKAGE_NAME_CHECKSUM
