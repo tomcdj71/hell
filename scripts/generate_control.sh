@@ -49,6 +49,7 @@ if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
   echo "Using local package files for $PACKAGE_NAME"
   PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*.deb" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
+    tree -L 3 $LOCAL_PACKAGE_PATH
     echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
     exit 1
   fi
