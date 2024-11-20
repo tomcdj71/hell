@@ -46,9 +46,10 @@ echo "LOCAL_PACKAGE_PATH: $LOCAL_PACKAGE_PATH"
 echo "=================="
 
 # Find the correct package file
-if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
+if [[ "$PACKAGE_NAME" == "libtorrent22" && "$PACKAGE_SUFFIX" == "-nightly" ]]; then
   echo "Using local package files for $PACKAGE_NAME"
-  PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*.deb" -print -quit)
+  PACKAGE_NAME="${PACKAGE_NAME}${PACKAGE_SUFFIX}"
+  PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
     tree -L 3 $LOCAL_PACKAGE_PATH
     echo "Error: Local package file for $PACKAGE_NAME not found in $LOCAL_PACKAGE_PATH"
@@ -163,7 +164,7 @@ fi
 cd - > /dev/null
 
 # Build the package
-PACKAGE_FILE_BUILT="${PACKAGE_NAME}${PACKAGE_SUFFIX}_${FULL_VERSION}_amd64.deb"
+PACKAGE_FILE_BUILT="${PACKAGE_NAME}_${FULL_VERSION}_amd64.deb"
 dpkg-deb --build "$PACKAGE_DIR" "$PACKAGE_FILE_BUILT" || {
   echo "Error building package: $PACKAGE_NAME"
   exit 1
