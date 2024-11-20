@@ -193,14 +193,14 @@ jobs:
             echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
             echo "${package_var}_name=${package_var}" >> $GITHUB_OUTPUT
             echo "build json file"
-            touch "${output_dir}/checksums/${PACKAGE_FILE_NAME}.json"
+            touch "${output_dir}/${PACKAGE_FILE_NAME}.json"
             echo "{
                 \"package_name\": \"${package_var}\",
                 \"checksum\": \"${checksum}\",
                 \"version\": \"${full_version}\",
                 \"category\": \"libtorrent\",
                 \"build_date\": \"${current_date}\"
-              }" >> "${output_dir}/checksums/${PACKAGE_FILE_NAME}.json"
+              }" >> "${output_dir}/${PACKAGE_FILE_NAME}.json"
           done 
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
@@ -289,7 +289,7 @@ jobs:
           set -e
           output_dir="${{ github.workspace }}/outputs"
           manifest_updates="{\"package_updates\": {}}"
-          for output_file in "${output_dir}"/checksums/*.json; do
+          for output_file in "${output_dir}"/*.json; do
             package_data=$(cat "${output_file}")
             package_name=$(echo "${package_data}" | jq -r '.package_name')
             manifest_updates=$(echo "${manifest_updates}" | jq ".package_updates += {\"${package_name}\": ${package_data}}")
