@@ -162,7 +162,7 @@ jobs:
         run: |
           echo "Installing libtorrent-rakshasa"
           cd ${{ env.REPO_PATH }}
-          for package in ${{ matrix.libtorrent_package_name }} libtorrent-dev${{ matrix.libtorrent_dev_package_name }}; do
+          for package in ${{ matrix.libtorrent_package_name }} ${{ matrix.libtorrent_dev_package_name }}; do
             sudo dpkg -i dist/current/libtorrent-rakshasa/${package}*.deb || {
               echo "${package} not found. Exiting."
               exit 1
