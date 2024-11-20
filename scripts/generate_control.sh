@@ -181,4 +181,3 @@ PACKAGE_NAME_CHECKSUM=$(cat "$TMPDIR/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha25
 echo "Checksum written to $TMPDIR/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
 echo "Checksum for $PACKAGE_NAME_WITH_SUFFIX: $PACKAGE_NAME_CHECKSUM"
 echo "Completed processing and packaging for $PACKAGE_NAME_WITH_SUFFIX"
-export PACKAGE_NAME_CHECKSUM

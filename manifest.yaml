@@ -188,7 +188,7 @@ packages:
     build_date: '2024-11-20'
     distribution:
     - bookworm
-  libtorrent21t64-nightly:
+  libtorrent22-nightly:
     version: 0.14.0-1build1
     checksum_sha256: dc0ff7ee368d414045ad8f24b592906032b2351dd7eec74e9664ac500dcfefc2
     category: libtorrent
