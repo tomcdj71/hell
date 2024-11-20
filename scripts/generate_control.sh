@@ -163,7 +163,7 @@ fi
 cd - > /dev/null
 
 # Build the package
-PACKAGE_FILE_BUILT="${PACKAGE_NAME}_${FULL_VERSION}_amd64.deb"
+PACKAGE_FILE_BUILT="${PACKAGE_NAME}${PACKAGE_SUFFIX}_${FULL_VERSION}_amd64.deb"
 dpkg-deb --build "$PACKAGE_DIR" "$PACKAGE_FILE_BUILT" || {
   echo "Error building package: $PACKAGE_NAME"
   exit 1
