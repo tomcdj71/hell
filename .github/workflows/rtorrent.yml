@@ -28,8 +28,8 @@ jobs:
       max-parallel: 1
       matrix:
         rtorrent_version:
-          - "0.9.8"
           - "0.10.0"
+          - "0.9.8"
         include:
           - rtorrent_version: "0.9.8"
             xmlrpc_branch: "stable"
@@ -52,7 +52,7 @@ jobs:
             xmlrpc_branch: "advanced"
             xmlrpc_package_name: "xmlrpc-c-advanced"
             libtorrent_version: "0.14.0"
-            libtorrent_package_name: "libtorrent21t64-nightly"
+            libtorrent_package_name: "libtorrent22-nightly"
             libtorrent_dev_package_name: "libtorrent-dev-nightly"
             libudns_required: true
             libudns_package_name: "libudns0"
