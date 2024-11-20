@@ -186,20 +186,19 @@ jobs:
               "${pool_path}" \
               "${package_suffix}" \
               "${LOCAL_PACKAGE_PATH}"
-            checksum_file="$TMPDIR/checksums/*_checksum"
-            FINAL_PACKAGE_NAME=$(cat $checksum_file | awk '{ print $1 }')
-            CHECKSUM=$(cat $checksum_file | awk '{ print $2 }')
-            package_var=$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g' | sed 's/_nightly//')
-            echo "${package_var}_checksum=${PACKAGE_NAME_CHECKSUM}" >> $GITHUB_OUTPUT
-            echo "${package_var}_file=${NEW_PACKAGE_FILE}" >> $GITHUB_OUTPUT
+            checksum_file="$(find "${tmp_dir}/checksums" -name "*.sha256")"
+            checksum="$(echo "${checksum_file}" | awk '{ print $2 }')"
+            package_var="$(echo "${checksum_file}" | awk '{ print $1 }')"
+            echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
+            echo "${package_var}_name=${package_var}" >> $GITHUB_OUTPUT
+            echo "{
+                \"package_name\": \"${package_var}\",
+                \"checksum\": \"${checksum}\",
+                \"version\": \"${full_version}\",
+                \"category\": \"libtorrent\",
+                \"build_date\": \"${current_date}\"
+              }" >> "${output_dir}/checksums/${PACKAGE_FILE_NAME}.json"
           done 
-          echo "{
-              \"package_name\": \"${FINAL_PACKAGE_NAME}\",
-              \"checksum\": \"${CHECKSUM}\",
-              \"version\": \"${full_version}\",
-              \"category\": \"libtorrent\",
-              \"build_date\": \"${current_date}\"
-            }" > "${output_dir}/${PACKAGE_FILE_NAME}.json"
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
       - name: Archive and Upload Libtorrent Packages
@@ -287,7 +286,7 @@ jobs:
           set -e
           output_dir="${{ github.workspace }}/outputs"
           manifest_updates="{\"package_updates\": {}}"
-          for output_file in "${output_dir}"/*.json; do
+          for output_file in "${output_dir}"/checksums/*.json; do
             package_data=$(cat "${output_file}")
             package_name=$(echo "${package_data}" | jq -r '.package_name')
             manifest_updates=$(echo "${manifest_updates}" | jq ".package_updates += {\"${package_name}\": ${package_data}}")

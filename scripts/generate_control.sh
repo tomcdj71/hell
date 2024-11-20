@@ -176,7 +176,7 @@ echo "Checksum for $PACKAGE_NAME: $CHECKSUM"
 
 # Write the checksum to a file
 mkdir -p "$TMPDIR/checksums"
-echo "$CHECKSUM" > "$TMPDIR/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
+echo "${PACKAGE_NAME_WITH_SUFFIX}:$CHECKSUM" > "$TMPDIR/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
 PACKAGE_NAME_CHECKSUM=$(cat "$TMPDIR/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256")
 echo "Checksum written to $TMPDIR/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
 echo "Checksum for $PACKAGE_NAME_WITH_SUFFIX: $PACKAGE_NAME_CHECKSUM"
