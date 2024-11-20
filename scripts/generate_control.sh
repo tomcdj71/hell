@@ -58,8 +58,7 @@ if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
     PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
 elif [[ "$PACKAGE_NAME" == "libtorrent-dev" && "$PACKAGE_SUFFIX" == "-nightly" ]]; then
   echo "Using local package files for $PACKAGE_NAME"
-  #PACKAGE_NAME="${PACKAGE_NAME}${PACKAGE_SUFFIX}"
-  PACKAGE_NAME="${PACKAGE_NAME}-nigthly"
+  PACKAGE_NAME="${PACKAGE_NAME}${PACKAGE_SUFFIX}"
   PACKAGE_FILE=$(find "$LOCAL_PACKAGE_PATH" -type f -name "${PACKAGE_NAME}*" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
     tree -L 3 $LOCAL_PACKAGE_PATH
