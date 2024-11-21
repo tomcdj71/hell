@@ -203,6 +203,15 @@ jobs:
                 \"category\": \"libtorrent\",
                 \"build_date\": \"${current_date}\"
               }" > "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json"
+            # Upload artifacts when a package is built
+            echo "Uploading artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
+            mkdir -p "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}"
+            cp "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json" "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+            cp "${pool_path}/${PACKAGE_NAME_WITH_SUFFIX}_${full_version}_${ARCHITECTURE}.deb" "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+            ls -al "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+            tar -czf "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}.tar.gz" -C "${output_dir}" "${PACKAGE_NAME_WITH_SUFFIX}"
+            rm -rf "${output_dir:?}/${PACKAGE_NAME_WITH_SUFFIX}"
+            echo "Uploaded artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
           done 
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
@@ -250,11 +259,21 @@ jobs:
           name: libtorrent-output-${{ matrix.build_type }}
           path: ${{ steps.libtorrent_update.outputs.tmp_dir }}/*.json
 
+  commit_and_push:
+    needs: libtorrent
+    runs-on: ubuntu-24.04
+    if: always()
+    steps:
+      - name: Checkout Binaries Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ github.workspace }}/binaries
+
       - name: Commit and Push Libtorrent Packages
-        if: steps.archive_and_upload.outputs.archive_processed == 'true'
         uses: EndBug/add-and-commit@v9
         env:
-          commit_message: ${{ steps.libtorrent_update.outputs.commit_message }}
+          commit_message: "Update libtorrent packages [automated]"
           author_email: "${{ secrets.COMMITER_EMAIL }}"
           author_name: "${{ secrets.COMMITER_NAME }}"
         with:
@@ -270,7 +289,7 @@ jobs:
           pull: "--rebase --autostash"
 
   trigger_manifest_update:
-    needs: libtorrent
+    needs: [libtorrent, commit_and_push]
     runs-on: ubuntu-24.04
     if: always()
     steps:
@@ -280,16 +299,9 @@ jobs:
           fetch-depth: 0
           path: ${{ github.workspace }}/binaries
 
-      - name: Download Package Data
+      - name: Download Package Data Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: libtorrent-output-release
-          path: ${{ github.workspace }}/outputs
-
-      - name: Download Package Data Nightly
-        uses: actions/download-artifact@v4
-        with:
-          name: libtorrent-output-nightly
           path: ${{ github.workspace }}/outputs
 
       - name: Collect Outputs
@@ -298,8 +310,11 @@ jobs:
           set -e
           output_dir="${{ github.workspace }}/outputs"
           manifest_updates="{\"package_updates\": {}}"
-          for output_file in "${output_dir}"/*.json; do
-            package_data=$(cat "${output_file}")
+          for artifact in "${output_dir}"/*.tar.gz; do
+            tar -xzf "${artifact}" -C "${output_dir}"
+          done
+          for json_file in "${output_dir}"/*/*.json; do
+            package_data=$(cat "${json_file}")
             package_name=$(echo "${package_data}" | jq -r '.package_name')
             manifest_updates=$(echo "${manifest_updates}" | jq ".package_updates += {\"${package_name}\": ${package_data}}")
           done
