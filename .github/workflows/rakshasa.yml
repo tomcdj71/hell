@@ -217,7 +217,7 @@ jobs:
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
       - name: Upload Package Data
-        if: steps.archive_and_upload.outputs.archive_processed == 'true'
+        if: steps.generate_deb_files.outputs.libtorrent_packaged == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: libtorrent-${{ matrix.build_type }}
