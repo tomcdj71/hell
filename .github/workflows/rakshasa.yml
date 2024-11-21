@@ -187,23 +187,22 @@ jobs:
               "${package_suffix}" \
               "${LOCAL_PACKAGE_PATH}"
             echo "build manifest-update file"
-            checksum_file="$(find "${tmp_dir}/checksums" -name "*.sha256")"
-            echo "checksum file"
+            checksum_file="${tmp_dir}/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
+            echo "checksum file: ${checksum_file}"
             cat "${checksum_file}"
-            checksum="$(echo "${checksum_file}" | awk '{ print $2 }')"
-            package_var="$(echo "${checksum_file}" | awk '{ print $1 }')"
+            checksum="$(cat "${checksum_file}")"
+            package_var="$(echo "${PACKAGE_NAME_WITH_SUFFIX}" | sed 's/[-.]/_/g' | sed 's/_nightly//')"
             echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
             echo "${package_var}_name=${PACKAGE_FILE_NAME}" >> $GITHUB_OUTPUT
             echo "${package_var}_version=${full_version}" >> $GITHUB_OUTPUT
             echo "build json file"
-            touch "${tmp_dir}/${PACKAGE_FILE_NAME}.json"
             echo "{
                 \"package_name\": \"${PACKAGE_FILE_NAME}\",
                 \"checksum\": \"${checksum}\",
                 \"version\": \"${full_version}\",
                 \"category\": \"libtorrent\",
                 \"build_date\": \"${current_date}\"
-              }" >> "${tmp_dir}/${PACKAGE_FILE_NAME}.json"
+              }" > "${tmp_dir}/${PACKAGE_FILE_NAME}.json"
           done 
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
