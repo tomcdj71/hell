@@ -171,7 +171,7 @@ jobs:
           PACKAGE_NAMES=("${PACKAGE_NAME}" "${DEV_PACKAGE_NAME}")
           for PACKAGE in "${PACKAGE_NAMES[@]}"; do
             PACKAGE_NAME="${PACKAGE}"
-            PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
+            PACKAGE_NAME_WITH_SUFFIX="${PACKAGE}${package_suffix}"
             cd "${tmp_dir}"
             sudo apt-get update
             if [ "${package_suffix}" != "-nightly" ]; then
@@ -197,12 +197,12 @@ jobs:
             echo "${package_var}_version=${full_version}" >> $GITHUB_OUTPUT
             echo "build json file"
             echo "{
-                \"package_name\": \"${PACKAGE_FILE_NAME}\",
+                \"package_name\": \"${PACKAGE_NAME_WITH_SUFFIX}\",
                 \"checksum\": \"${checksum}\",
                 \"version\": \"${full_version}\",
                 \"category\": \"libtorrent\",
                 \"build_date\": \"${current_date}\"
-              }" > "${tmp_dir}/${PACKAGE_FILE_NAME}.json"
+              }" > "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json"
           done 
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
