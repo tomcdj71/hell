@@ -281,7 +281,9 @@ jobs:
           default_author: user_info
           message: ${{ env.commit_message }}
           cwd: ${{ github.workspace }}/binaries
-          add: "--all"
+          add: |
+            dist/current/libtorrent-rakshasa/
+            dist/archive/libtorrent-rakshasa/
           push: true
           pull: "--rebase --autostash"
 
