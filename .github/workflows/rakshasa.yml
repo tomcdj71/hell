@@ -205,50 +205,16 @@ jobs:
                 \"category\": \"libtorrent\",
                 \"build_date\": \"${current_date}\"
               }" > "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json"
-            # Upload artifacts when a package is built
             echo "Uploading artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
             mkdir -p "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}"
-            echo "1"
             cp "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
-            echo "2"
             cp "${pool_path}/${PACKAGE_NAME_WITH_SUFFIX}_${full_version}_${ARCHITECTURE}.deb" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
-            echo "3"
             ls -al "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
             tar -czf "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}.tar.gz" -C "${artifacts_dir}" "${PACKAGE_NAME_WITH_SUFFIX}"
             rm -rf "${artifacts_dir:?}/${PACKAGE_NAME_WITH_SUFFIX}"
             echo "Uploaded artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
           done 
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
-
-      - name: Archive and Upload Libtorrent Packages
-        id: archive_and_upload
-        if: steps.generate_deb_files.outputs.libtorrent_packaged == 'true'
-        env:
-          full_version: ${{ steps.libtorrent_update.outputs.full_version }}
-          package_names: |
-            ${{ steps.libtorrent_update.outputs.package_name }}
-            ${{ steps.libtorrent_update.outputs.dev_package_name }}
-          package_suffix: ${{ steps.libtorrent_update.outputs.package_suffix }}
-          pool_path: ${{ env.POOL_PATH }}
-          current_libtorrent_path: ${{ env.CURRENT_LIBTORRENT_PATH }}
-          archive_libtorrent_path: ${{ env.ARCHIVE_LIBTORRENT_PATH }}
-          scripts_path: ${{ env.SCRIPTS_PATH }}
-          ARCHITECTURE: ${{ steps.libtorrent_update.outputs.architecture }}
-        run: |
-          set -e
-          for PACKAGE in $package_names; do
-            PACKAGE_FILE_NAME="${PACKAGE}${package_suffix}"
-            PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_${ARCHITECTURE}.deb"
-            if [ -f "${pool_path}/${PACKAGE_FILE}" ]; then
-              bash "${scripts_path}/archive_packages.sh" \
-                "${current_libtorrent_path}" \
-                "${archive_libtorrent_path}" \
-                "${pool_path}/${PACKAGE_FILE}"
-            else
-              echo "Package ${PACKAGE_FILE} not found in ${pool_path}"
-            fi 
-          done
-          echo "archive_processed=true" >> $GITHUB_OUTPUT
 
       - name: Upload Package Data
         if: steps.archive_and_upload.outputs.archive_processed == 'true'
@@ -257,13 +223,6 @@ jobs:
           name: libtorrent-${{ matrix.build_type }}
           path: ${{ github.workspace }}/artifacts
       
-      - name: Upload Modified Binaries Repository
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: binaries-repo
-          path: ${{ env.REPO_PATH }}
-
   commit_and_push:
     needs: libtorrent
     runs-on: ubuntu-24.04
@@ -275,11 +234,38 @@ jobs:
           fetch-depth: 0
           path: ${{ github.workspace }}/binaries
 
-      - name: Download Modified Binaries Repository
+      - name: Download Package Data Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: binaries-repo
-          path: ${{ github.workspace }}/binaries
+          name: |
+            libtorrent-artifacts-nightly
+            libtorrent-artifacts-release
+          path: ${{ github.workspace }}/outputs
+
+      - name: Extract Package Data Artifacts
+        run: |
+          set -e
+          output_dir="${{ github.workspace }}/outputs"
+          find "${output_dir}" -type f -name "*.tar.gz" -exec tar -xzf {} -C "${output_dir}" \;
+
+      - name: Archive and Upload Libtorrent Packages
+        env:
+          REPO_PATH: "${{ github.workspace }}/binaries"
+          CURRENT_LIBTORRENT_PATH: "${{ github.workspace }}/binaries/dist/current/libtorrent-rakshasa"
+          ARCHIVE_LIBTORRENT_PATH: "${{ github.workspace }}/binaries/dist/archive/libtorrent-rakshasa"
+          POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
+          SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
+        run: |
+          set -e
+          mkdir -p "${POOL_PATH}"
+          output_dir="${{ github.workspace }}/outputs"
+          for deb_file in $(find "${output_dir}" -type f -name "*.deb"); do
+            cp "${deb_file}" "${POOL_PATH}/"
+            bash "${SCRIPTS_PATH}/archive_packages.sh" \
+              "${CURRENT_LIBTORRENT_PATH}" \
+              "${ARCHIVE_LIBTORRENT_PATH}" \
+              "${POOL_PATH}/$(basename "${deb_file}")"
+          done
 
       - name: Show Git Status
         run: |
