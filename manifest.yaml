@@ -168,29 +168,29 @@ packages:
     distribution:
     - bookworm
   libtorrent-dev:
-    version: 0.13.8-1build1
-    checksum_sha256: 6cf875fffd0e45edcb30b9e0205250e440ab2c11d7533aa2cc4c4010f487c98b
+    version: 0.13.8-1build2
+    checksum_sha256: 15474ec3da1c1e5fb38e8ecdb607b2aaffaa1470c30641e9a50ca9b984101bd4
     category: libtorrent
     build_date: '2024-11-21'
     distribution:
     - bookworm
   libtorrent21t64:
-    version: 0.13.8-1build1
-    checksum_sha256: 61de0523df72758c18b5bb97d5ef9ed91784eb3c050d7871a41561d676d4bd72
+    version: 0.13.8-1build2
+    checksum_sha256: e9077f6ffd0f0dae6d5ff9b77c883296d94006c0279f31601dfc07873fb4e4a4
     category: libtorrent
     build_date: '2024-11-21'
     distribution:
     - bookworm
   libtorrent-dev-nightly:
-    version: 0.14.0-1build2
-    checksum_sha256: 5385f63cce79717ce08ba73ac8928485d1b13ac24d9729feca7a28957f5b9075
+    version: 0.14.0-1build3
+    checksum_sha256: dec000d55b83e44963fd5a50d38b5e70cd2c63dd337779cfd869065b0f4945d4
     category: libtorrent
     build_date: '2024-11-21'
     distribution:
     - bookworm
   libtorrent22-nightly:
-    version: 0.14.0-1build2
-    checksum_sha256: f02d1971c2f709713f0d7059e1b7087a86c654d9dd887c914de9912f89d67eac
+    version: 0.14.0-1build3
+    checksum_sha256: d0d248cd33aea74f8bff49e199e058f731e6b040558fc4b155e554122f686768
     category: libtorrent
     build_date: '2024-11-21'
     distribution:
