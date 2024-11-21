@@ -168,6 +168,8 @@ jobs:
         run: |
           set -e
           mkdir -p "${output_dir}"
+          artifacts_dir="${{ github.workspace }}/artifacts"
+          mkdir -p "${artifacts_dir}"
           PACKAGE_NAMES=("${PACKAGE_NAME}" "${DEV_PACKAGE_NAME}")
           for PACKAGE in "${PACKAGE_NAMES[@]}"; do
             PACKAGE_NAME="${PACKAGE}"
@@ -205,12 +207,12 @@ jobs:
               }" > "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json"
             # Upload artifacts when a package is built
             echo "Uploading artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
-            mkdir -p "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}"
-            cp "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json" "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+            mkdir -p "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}"
+            cp "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
             cp "${pool_path}/${PACKAGE_NAME_WITH_SUFFIX}_${full_version}_${ARCHITECTURE}.deb" "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
-            ls -al "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
-            tar -czf "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}.tar.gz" -C "${output_dir}" "${PACKAGE_NAME_WITH_SUFFIX}"
-            rm -rf "${output_dir:?}/${PACKAGE_NAME_WITH_SUFFIX}"
+            ls -al "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+            tar -czf "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}.tar.gz" -C "${artifacts_dir}" "${PACKAGE_NAME_WITH_SUFFIX}"
+            rm -rf "${artifacts_dir:?}/${PACKAGE_NAME_WITH_SUFFIX}"
             echo "Uploaded artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
           done 
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
@@ -245,19 +247,12 @@ jobs:
           done
           echo "archive_processed=true" >> $GITHUB_OUTPUT
 
-      - name: List JSON Files
-        id: list_json_files
-        run: |
-          ls -al ${{ steps.libtorrent_update.outputs.tmp_dir }}/*.json
-          base_dir=$(dirname $(find ${{ steps.libtorrent_update.outputs.tmp_dir }} -name "*.json" | head -n 1))
-          echo "base_dir=${base_dir}" >> $GITHUB_OUTPUT
-
       - name: Upload Package Data
         if: steps.archive_and_upload.outputs.archive_processed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: libtorrent-output-${{ matrix.build_type }}
-          path: ${{ steps.libtorrent_update.outputs.tmp_dir }}/*.json
+          name: libtorrent-${{ matrix.build_type }}
+          path: ${{ github.workspace }}/artifacts
 
   commit_and_push:
     needs: libtorrent
@@ -283,8 +278,7 @@ jobs:
           message: ${{ env.commit_message }}
           cwd: "./binaries"
           add: |
-            dist/current/libtorrent-rakshasa/
-            dist/archive/libtorrent-rakshasa/
+            dist/
           push: true
           pull: "--rebase --autostash"
 
