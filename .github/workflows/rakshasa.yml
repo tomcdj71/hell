@@ -280,7 +280,7 @@ jobs:
             package_name=$(echo "${package_data}" | jq -r '.package_name')
             package_version=$(echo "${package_data}" | jq -r '.version')
             commit_description="${commit_description}\n- ${package_name} updated to ${package_version}"
-          done 
+          done
           commit_message="Update libtorrent packages [automated]"
           echo "commit_message=${commit_message}${commit_description}" >> $GITHUB_OUTPUT
 
