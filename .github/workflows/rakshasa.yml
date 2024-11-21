@@ -226,7 +226,6 @@ jobs:
   commit_and_push:
     needs: libtorrent
     runs-on: ubuntu-24.04
-    if: always()
     steps:
       - name: Checkout Binaries Repository
         uses: actions/checkout@v4
@@ -238,8 +237,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: |
-            libtorrent-artifacts-nightly
-            libtorrent-artifacts-release
+            libtorrent-nightly
+            libtorrent-release
           path: ${{ github.workspace }}/outputs
 
       - name: Extract Package Data Artifacts
@@ -292,7 +291,6 @@ jobs:
   trigger_manifest_update:
     needs: [libtorrent, commit_and_push]
     runs-on: ubuntu-24.04
-    if: always()
     steps:
       - name: Checkout Binaries Repository
         uses: actions/checkout@v4
