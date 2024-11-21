@@ -146,7 +146,7 @@ if [ "$NO_CHECK" = false ]; then
   # if package is libtorrent22, ensure to to a symlink of ./usr/lib/x86_64-linux-gnu/libtorrent.so.22.0.0 to ./usr/lib/x86_64-linux-gnu/libtorrent.so
   if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
     echo "Creating symlink for libtorrent22"
-    ln -s usr/lib/x86_64-linux-gnu/libtorrent.so.22.0.0 usr/lib/x86_64-linux-gnu/libtorrent.so
+    [ ! -e usr/lib/x86_64-linux-gnu/libtorrent.so ] && ln -s usr/lib/x86_64-linux-gnu/libtorrent.so.22.0.0 usr/lib/x86_64-linux-gnu/libtorrent.so
   fi
   installed_size=$(du -sk . | cut -f1)
   echo "Old Installed-Size: $old_installed_size kB"
