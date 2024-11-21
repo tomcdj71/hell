@@ -208,8 +208,11 @@ jobs:
             # Upload artifacts when a package is built
             echo "Uploading artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
             mkdir -p "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}"
+            echo "1"
             cp "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+            echo "2"
             cp "${pool_path}/${PACKAGE_NAME_WITH_SUFFIX}_${full_version}_${ARCHITECTURE}.deb" "${output_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+            echo "3"
             ls -al "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
             tar -czf "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}.tar.gz" -C "${artifacts_dir}" "${PACKAGE_NAME_WITH_SUFFIX}"
             rm -rf "${artifacts_dir:?}/${PACKAGE_NAME_WITH_SUFFIX}"
