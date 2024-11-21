@@ -279,10 +279,15 @@ jobs:
             package_data=$(cat "${json_file}")
             package_name=$(echo "${package_data}" | jq -r '.package_name')
             package_version=$(echo "${package_data}" | jq -r '.version')
-            commit_description="${commit_description}\n- ${package_name} updated to ${package_version}"
+            commit_description="${commit_description}
+            - ${package_name} updated to ${package_version}"
           done
           commit_message="Update libtorrent packages [automated]"
-          echo "commit_message=${commit_message}${commit_description}" >> $GITHUB_OUTPUT
+          echo "Commit message is:"
+          echo "${commit_message}${commit_description}"
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          echo "${commit_message}${commit_description}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Commit and Push Libtorrent Packages
         uses: EndBug/add-and-commit@v9
