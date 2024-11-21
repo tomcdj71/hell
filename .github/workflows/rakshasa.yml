@@ -213,7 +213,7 @@ jobs:
             tar -czf "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}.tar.gz" -C "${artifacts_dir}" "${PACKAGE_NAME_WITH_SUFFIX}"
             rm -rf "${artifacts_dir:?}/${PACKAGE_NAME_WITH_SUFFIX}"
             echo "Uploaded artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
-          done 
+          done
           echo "libtorrent_packaged=true" >> $GITHUB_OUTPUT
 
       - name: Upload Package Data
@@ -269,10 +269,25 @@ jobs:
           git status
           git ls-files
 
+      - name: Build Commit Message
+        id: build_commit_message
+        run: |
+          set -e
+          output_dir="${{ github.workspace }}/outputs"
+          commit_description=""
+          for json_file in $(find "${output_dir}" -type f -name "*.json"); do
+            package_data=$(cat "${json_file}")
+            package_name=$(echo "${package_data}" | jq -r '.package_name')
+            package_version=$(echo "${package_data}" | jq -r '.version')
+            commit_description="${commit_description}\n- ${package_name} updated to ${package_version}"
+          done
+          commit_message="Update libtorrent packages [automated]"
+          echo "commit_message=${commit_message}${commit_description}" >> $GITHUB_OUTPUT
+
       - name: Commit and Push Libtorrent Packages
         uses: EndBug/add-and-commit@v9
         env:
-          commit_message: "Update libtorrent packages [automated]"
+          commit_message: "${{ steps.build_commit_message.outputs.commit_message }}"
           author_email: "${{ secrets.COMMITER_EMAIL }}"
           author_name: "${{ secrets.COMMITER_NAME }}"
         with:
