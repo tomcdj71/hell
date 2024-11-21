@@ -190,7 +190,7 @@ jobs:
             checksum_file="${tmp_dir}/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
             echo "checksum file: ${checksum_file}"
             cat "${checksum_file}"
-            checksum="$(cat "${checksum_file}")"
+            checksum=$(cat "${checksum_file}" | awk -F':' '{print $2}' | xargs)
             package_var="$(echo "${PACKAGE_NAME_WITH_SUFFIX}" | sed 's/[-.]/_/g' | sed 's/_nightly//')"
             echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
             echo "${package_var}_name=${PACKAGE_FILE_NAME}" >> $GITHUB_OUTPUT
