@@ -280,7 +280,7 @@ jobs:
           author_email: "${{ env.author_email }}"
           default_author: user_info
           message: ${{ env.commit_message }}
-          cwd: ${{ github.workspace }}/binaries
+          cwd: "./binaries"
           add: |
             dist/current/libtorrent-rakshasa/
             dist/archive/libtorrent-rakshasa/
