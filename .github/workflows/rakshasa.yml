@@ -256,6 +256,13 @@ jobs:
         with:
           name: libtorrent-${{ matrix.build_type }}
           path: ${{ github.workspace }}/artifacts
+      
+      - name: Upload Modified Binaries Repository
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-repo
+          path: ${{ env.REPO_PATH }}
 
   commit_and_push:
     needs: libtorrent
@@ -268,6 +275,18 @@ jobs:
           fetch-depth: 0
           path: ${{ github.workspace }}/binaries
 
+      - name: Download Modified Binaries Repository
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-repo
+          path: ${{ github.workspace }}/binaries
+
+      - name: Show Git Status
+        run: |
+          cd ${{ github.workspace }}/binaries
+          git status
+          git ls-files
+
       - name: Commit and Push Libtorrent Packages
         uses: EndBug/add-and-commit@v9
         env:
@@ -279,9 +298,8 @@ jobs:
           author_email: "${{ env.author_email }}"
           default_author: user_info
           message: ${{ env.commit_message }}
-          cwd: "./binaries"
-          add: |
-            dist/
+          cwd: ${{ github.workspace }}/binaries
+          add: "--all"
           push: true
           pull: "--rebase --autostash"
 
@@ -307,10 +325,8 @@ jobs:
           set -e
           output_dir="${{ github.workspace }}/outputs"
           manifest_updates="{\"package_updates\": {}}"
-          for artifact in "${output_dir}"/*.tar.gz; do
-            tar -xzf "${artifact}" -C "${output_dir}"
-          done
-          for json_file in "${output_dir}"/*/*.json; do
+          find "${output_dir}" -type f -name "*.tar.gz" -execdir tar -xzf "{}" \;
+          for json_file in $(find "${output_dir}" -type f -name "*.json"); do
             package_data=$(cat "${json_file}")
             package_name=$(echo "${package_data}" | jq -r '.package_name')
             manifest_updates=$(echo "${manifest_updates}" | jq ".package_updates += {\"${package_name}\": ${package_data}}")
