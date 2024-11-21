@@ -236,9 +236,6 @@ jobs:
       - name: Download Package Data Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: |
-            libtorrent-nightly
-            libtorrent-release
           path: ${{ github.workspace }}/outputs
 
       - name: Extract Package Data Artifacts
