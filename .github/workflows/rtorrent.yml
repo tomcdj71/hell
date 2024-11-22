@@ -272,7 +272,7 @@ jobs:
             sudo apt-get update
             apt-get download "rtorrent"
             bash "${scripts_path}/generate_control.sh" \
-              "${PACKAGE_NAME}" \
+              "${PACKAGE_NAME_WITH_SUFFIX}" \
               "${install_dir}" \
               "${tmp_dir}" \
               "${full_version}" \
