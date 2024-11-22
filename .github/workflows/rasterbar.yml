@@ -207,6 +207,7 @@ jobs:
           PACKAGE_NAMES=("${package_name}" "${dev_package_name}" "${python_package_name}")
           for PACKAGE in "${PACKAGE_NAMES[@]}"; do
             cd "${tmp_dir}"
+            apt-get download "${PACKAGE}"
             bash "${scripts_path}/generate_control.sh" \
               "${PACKAGE}" \
               "${install_dir}" \
