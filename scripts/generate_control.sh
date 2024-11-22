@@ -59,6 +59,7 @@ if [[ "$PACKAGE_NAME" == "libtorrent22" || ("$PACKAGE_NAME" == "libtorrent-dev" 
   cp "$PACKAGE_FILE" "$TMPDIR/"
   PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
 else
+  PACKAGE_NAME=$(echo "$PACKAGE_NAME" | sed 's/-nightly$//')
   PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}_*.deb" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
     echo "Error: Package file for $PACKAGE_NAME not found in $TMPDIR"
