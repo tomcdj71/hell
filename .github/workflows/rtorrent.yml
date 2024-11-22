@@ -183,6 +183,18 @@ jobs:
               echo "Warning: $patch_file is not a valid file. Skipping."
             fi
           done
+      
+      - name: Fix libtorrent Symlinks
+        if: steps.rtorrent_update.outputs.update_needed == 'true' && matrix.libtorrent_version == "0.14.0"
+        run: |
+          echo "Fixing libtorrent symlinks"
+          LIBTORRENT_LIB_PATH="/usr/lib/x86_64-linux-gnu"
+          if [ ! -e "${LIBTORRENT_LIB_PATH}/libtorrent.so.22" ]; then
+            sudo ln -sf libtorrent.so.22.0.0 "${LIBTORRENT_LIB_PATH}/libtorrent.so.22"
+          fi
+          if [ ! -e "${LIBTORRENT_LIB_PATH}/libtorrent.so" ]; then
+            sudo ln -sf libtorrent.so.22 "${LIBTORRENT_LIB_PATH}/libtorrent.so"
+          fi
 
       - name: Configure rtorrent
         if: steps.rtorrent_update.outputs.update_needed == 'true'
