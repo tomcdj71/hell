@@ -22,7 +22,7 @@ jobs:
       ARCHIVE_RTORRENT_PATH: "${{ github.workspace }}/binaries/dist/archive/rtorrent"
       PATCHES_PATH: "${{ github.workspace }}/binaries/patches"
       SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
-      TIME_DIFF: 480000  # hours
+      TIME_DIFF: 480000  # hour
 
     strategy:
       max-parallel: 1
