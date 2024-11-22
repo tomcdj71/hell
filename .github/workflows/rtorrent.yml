@@ -212,7 +212,7 @@ jobs:
         if: steps.configure_rtorrent.outputs.configured == 'true'
         id: compile_rtorrent
         run: |
-          set -e
+          set -e 
           cd ${{ github.workspace }}/rtorrent
           rtorrent_pipe=""
           rtorrent_level=""
