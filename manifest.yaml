@@ -20,6 +20,20 @@ packages:
     build_date: '2024-10-28'
     distribution:
     - bookworm
+  mktorrent:
+    version: 1.2.0-1build1
+    checksum_sha256: ed5e651e4884cd3126282e8978d9b359be639e2711d466fe589d084808fe5be0
+    category: mktorrent
+    build_date: '2024-11-02'
+    distribution:
+    - bookworm
+  libudns:
+    version: 0.4.1-1build1
+    checksum_sha256: c1a0a3d1d256259e7070858a1ee9cdd4df17d8b95771491de4fee67eb29ff690
+    category: libudns
+    build_date: '2024-11-02'
+    distribution:
+    - bookworm
   deluge203:
     version: 2.0.3-4build1
     checksum_sha256: 2eb8d5a4af51032c846081594de40507
@@ -76,37 +90,9 @@ packages:
     build_date: '2024-11-22'
     distribution:
     - bookworm
-  mktorrent:
-    version: 1.2.0-1build1
-    checksum_sha256: ed5e651e4884cd3126282e8978d9b359be639e2711d466fe589d084808fe5be0
-    category: mktorrent
-    build_date: '2024-11-02'
-    distribution:
-    - bookworm
-  libudns:
-    version: 0.4.1-1build1
-    checksum_sha256: c1a0a3d1d256259e7070858a1ee9cdd4df17d8b95771491de4fee67eb29ff690
-    category: libudns
-    build_date: '2024-11-02'
-    distribution:
-    - bookworm
-  libtorrent-rasterbar2.0t64:
-    version: 2.0.10-1.1build2
-    checksum_sha256: 64719ecc6a076b34a335b66b5576884f78e8608e4d9c12f68d5453f175293b69
-    category: libtorrent-rasterbar
-    build_date: '2024-11-22'
-    distribution:
-    - bookworm
   transmission-cli:
     version: 4.0.6-1build1
     checksum_sha256: c82a060a34bca3f447e70ca097f17c7e8520333ab221021c8cad8e2712bc414e
-    category: transmission
-    build_date: '2024-11-21'
-    distribution:
-    - bookworm
-  transmission-common:
-    version: 4.0.6-1build1
-    checksum_sha256: 7b9cbbe99d96779f9d7a14cd59db15f416c5f0173d7e197b2bd96f480a8af5b4
     category: transmission
     build_date: '2024-11-21'
     distribution:
@@ -118,25 +104,18 @@ packages:
     build_date: '2024-11-21'
     distribution:
     - bookworm
+  transmission-common:
+    version: 4.0.6-1build1
+    checksum_sha256: 7b9cbbe99d96779f9d7a14cd59db15f416c5f0173d7e197b2bd96f480a8af5b4
+    category: transmission
+    build_date: '2024-11-21'
+    distribution:
+    - bookworm
   transmission-common-nightly:
     version: 4.1.0-1build1
     checksum_sha256: fdeb1c6fa9276e7697c9d73d03a74d0bd6e985d4c8cb29266e3b085b4f974f01
     category: transmission
     build_date: '2024-11-21'
-    distribution:
-    - bookworm
-  libtorrent-rasterbar-dev:
-    version: 2.0.10-1.1build2
-    checksum_sha256: 69d73f59bc2947fb4ff0d4ce9c008e5ffe125f2dfdbe2d83b5fa1cc24c353975
-    category: libtorrent-rasterbar
-    build_date: '2024-11-22'
-    distribution:
-    - bookworm
-  python3-libtorrent:
-    version: 2.0.10-1.1build2
-    checksum_sha256: b0beb9481227aa09ece3b5efdcb6ee8e197a2875b5a5b6217471f3dc96f19f0a
-    category: libtorrent-rasterbar
-    build_date: '2024-11-22'
     distribution:
     - bookworm
   qbittorrent-nox-nightly:
@@ -153,16 +132,37 @@ packages:
     build_date: '2024-11-13'
     distribution:
     - bookworm
-  libtorrent-dev:
-    version: 0.13.8-1build3
-    checksum_sha256: 1c36937b29a5b75bb95398d3fc0fff016da49efc97560ed7b92c560ce823148f
-    category: libtorrent
-    build_date: '2024-11-21'
+  libtorrent-rasterbar2.0t64:
+    version: 2.0.10-1.1build2
+    checksum_sha256: 64719ecc6a076b34a335b66b5576884f78e8608e4d9c12f68d5453f175293b69
+    category: libtorrent-rasterbar
+    build_date: '2024-11-22'
+    distribution:
+    - bookworm
+  libtorrent-rasterbar-dev:
+    version: 2.0.10-1.1build2
+    checksum_sha256: 69d73f59bc2947fb4ff0d4ce9c008e5ffe125f2dfdbe2d83b5fa1cc24c353975
+    category: libtorrent-rasterbar
+    build_date: '2024-11-22'
     distribution:
     - bookworm
   libtorrent21t64:
     version: 0.13.8-1build3
     checksum_sha256: 9ba8cda6166307c9eb395dcfaea4ff918c914050bcaa9ab717671b81c71b9b43
+    category: libtorrent
+    build_date: '2024-11-21'
+    distribution:
+    - bookworm
+  libtorrent22-nightly:
+    version: 0.14.0-1build3
+    checksum_sha256: 63db09c9583df64082472fb58811ce554b5252490db2ada3f4c7e8170520a5a2
+    category: libtorrent
+    build_date: '2024-11-21'
+    distribution:
+    - bookworm
+  libtorrent-dev:
+    version: 0.13.8-1build3
+    checksum_sha256: 1c36937b29a5b75bb95398d3fc0fff016da49efc97560ed7b92c560ce823148f
     category: libtorrent
     build_date: '2024-11-21'
     distribution:
@@ -174,11 +174,11 @@ packages:
     build_date: '2024-11-21'
     distribution:
     - bookworm
-  libtorrent22-nightly:
-    version: 0.14.0-1build3
-    checksum_sha256: 63db09c9583df64082472fb58811ce554b5252490db2ada3f4c7e8170520a5a2
-    category: libtorrent
-    build_date: '2024-11-21'
+  python3-libtorrent:
+    version: 2.0.10-1.1build2
+    checksum_sha256: b0beb9481227aa09ece3b5efdcb6ee8e197a2875b5a5b6217471f3dc96f19f0a
+    category: libtorrent-rasterbar
+    build_date: '2024-11-22'
     distribution:
     - bookworm
 applications:
