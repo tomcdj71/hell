@@ -310,7 +310,7 @@ jobs:
           echo "rtorrent_packaged=true" >> $GITHUB_OUTPUT
 
       - name: Upload Package Data
-        if: steps.generate_deb_files.outputs.rtorrent_packaged == 'true'
+        if: steps.generate_deb_file.outputs.rtorrent_packaged == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: rtorrent-${{ matrix.rtorrent_version }}${{ matrix.package_suffix }}
