@@ -196,7 +196,6 @@ jobs:
             ./autogen.sh
           fi
           ./configure --prefix=/usr --with-xmlrpc-c --with-ncurses --disable-shared LDFLAGS='-static'
-          [ ! -e usr/lib/x86_64-linux-gnu/libtorrent.so ] && ln -s /usr/lib/x86_64-linux-gnu/libtorrent.so.22.0.0 /usr/lib/x86_64-linux-gnu/libtorrent.so
           echo "configured=true" >> $GITHUB_OUTPUT
 
       - name: Compile rtorrent
