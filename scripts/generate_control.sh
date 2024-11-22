@@ -143,6 +143,10 @@ if [ "$NO_CHECK" = false ]; then
   old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
   echo "Performing rsync to merge installation files..."
   rsync -auv --existing "$INSTALL_DIR/" "./"
+  if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
+    echo "Creating symlink for libtorrent22"
+    [ ! -e usr/lib/x86_64-linux-gnu/libtorrent.so ] && ln -s usr/lib/x86_64-linux-gnu/libtorrent.so.22.0.0 usr/lib/x86_64-linux-gnu/libtorrent.so
+  fi
   installed_size=$(du -sk . | cut -f1)
   echo "Old Installed-Size: $old_installed_size kB"
   echo "New Installed-Size: $installed_size kB"
