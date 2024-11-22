@@ -221,8 +221,8 @@ jobs:
         if: steps.generate_deb_files.outputs.transmission_packaged == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: transmission-artifacts-${{ matrix.build_type }}
-          path: ${{ github.workspace }}/artifacts/transmission-artifacts.tar.gz
+          name: transmission-${{ matrix.build_type }}
+          path: ${{ github.workspace }}/artifacts
 
   commit_and_push:
     needs: transmission
@@ -237,14 +237,14 @@ jobs:
       - name: Download Package Data Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: transmission-artifacts-${{ matrix.build_type }}
+          name: transmission-${{ matrix.build_type }}
           path: ${{ github.workspace }}/outputs
 
       - name: Extract Package Data Artifacts
         run: |
           set -e
           output_dir="${{ github.workspace }}/outputs"
-          tar -xzf "${output_dir}/transmission-artifacts.tar.gz" -C "${output_dir}"
+          find "${output_dir}" -type f -name "*.tar.gz" -exec tar -xzf {} -C "${output_dir}" \;
 
       - name: Archive and Upload Transmission Packages
         env:
