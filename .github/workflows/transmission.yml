@@ -188,11 +188,6 @@ jobs:
               "${pool_path}" \
               "${package_suffix}" \
               "${LOCAL_PACKAGE_PATH}"
-            ORIGINAL_PACKAGE_FILE="${PACKAGE_NAME}_${full_version}_${architecture}.deb"
-            NEW_PACKAGE_FILE="${PACKAGE_FILE_NAME}_${full_version}_${architecture}.deb"
-            if [ "${ORIGINAL_PACKAGE_FILE}" != "${NEW_PACKAGE_FILE}" ]; then
-              mv "${pool_path}/${ORIGINAL_PACKAGE_FILE}" "${pool_path}/${NEW_PACKAGE_FILE}"
-            fi
             checksum=$(sha256sum "${pool_path}/${NEW_PACKAGE_FILE}" | awk '{ print $1 }')
             package_var="$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g')"
             echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
