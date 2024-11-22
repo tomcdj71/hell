@@ -90,20 +90,6 @@ packages:
     build_date: '2024-11-02'
     distribution:
     - bookworm
-  libtorrent21:
-    version: 0.13.8-1build1
-    checksum_sha256: ac108e0c55d333db6925944e1797062bb2e2b0803518fe92ca91e9b7416d5c8a
-    category: libtorrent
-    build_date: '2024-11-03'
-    distribution:
-    - bookworm
-  libtorrent21-nightly:
-    version: 0.14.0-1build1
-    checksum_sha256: 53db07352ff7cfba93d983551762d7e52cdec6aadbbf0fc0ba6d0d6c030e0bf3
-    category: libtorrent
-    build_date: '2024-11-03'
-    distribution:
-    - bookworm
   libtorrent-rasterbar2.0t64:
     version: 2.0.10-1.1build4
     checksum_sha256: 62c27285b2da9458fc78c80ed33172e91dfb4b9d43e52e6040b3121ec29adb8c
