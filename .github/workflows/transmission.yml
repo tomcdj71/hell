@@ -316,7 +316,7 @@ jobs:
         run: |
           set -e
           output_dir="${{ github.workspace }}/outputs"
-          tar -xzf "${output_dir}/transmission-artifacts.tar.gz" -C "${output_dir}"
+          find "${output_dir}" -type f -name "*.tar.gz" -exec tar -xzf {} -C "${output_dir}" \;
 
       - name: Collect Outputs
         id: collect_outputs
