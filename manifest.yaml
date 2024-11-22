@@ -64,14 +64,14 @@ packages:
     - bookworm
   rtorrent:
     version: 0.9.8-1build2
-    checksum_sha256: f1ce0225f5412b349ca58cacdd0aae79a66d2ffdd7303ac9fd32a0d741f30b50
+    checksum_sha256: 48087ca359cb071d4ca1ac3c50b817168f5a8aade9254408660471c0cd3957da
     category: libtorrent
     build_date: '2024-11-22'
     distribution:
     - bookworm
   rtorrent-nightly:
     version: 0.10.0-1build2
-    checksum_sha256: eed334c537793d8ebf7fb57972c393f215581608069850ec63a8c01af9bd35d6
+    checksum_sha256: f7a380a7510ba9f2c1157665804467c27403808604b92cedcbd5ab25e7725fe9
     category: libtorrent
     build_date: '2024-11-22'
     distribution:
