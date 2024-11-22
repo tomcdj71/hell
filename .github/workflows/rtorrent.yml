@@ -270,9 +270,7 @@ jobs:
             PACKAGE_NAME_WITH_SUFFIX="${PACKAGE}${package_suffix}"
             cd "${tmp_dir}"
             sudo apt-get update
-            if [ "${package_suffix}" != "-nightly" ]; then
-              apt-get download "rtorrent"
-            fi
+            apt-get download "rtorrent"
             bash "${scripts_path}/generate_control.sh" \
               "${PACKAGE_NAME}" \
               "${install_dir}" \
