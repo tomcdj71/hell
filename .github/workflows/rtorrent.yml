@@ -318,7 +318,6 @@ jobs:
 
   commit_and_push:
     needs: rtorrent
-    if: needs.rtorrent.outputs.update_needed == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Binaries Repository
