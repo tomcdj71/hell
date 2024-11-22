@@ -174,7 +174,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}/rtorrent
           find ${{ env.PATCHES_PATH }}/rtorrent -type f -name '*.patch' -exec dos2unix {} +
-          for patch in "${{ matrix.patches[@] }}"; do
+          for patch in ${{ join(matrix.patches, ' ') }}; do
             patch_file="${{ env.PATCHES_PATH }}/rtorrent/${patch}"
             if [ -f "$patch_file" ]; then
               echo "Applying patch $patch_file"
