@@ -172,7 +172,7 @@ mv "$PACKAGE_FILE_BUILT" "$POOL_PATH/" || {
   echo "Error moving package: $PACKAGE_FILE_BUILT"
   exit 1
 }
-tree -L 2 $POOL_PATH/
+tree -L 2 "$POOL_PATH/"
 
 echo "$PACKAGE_FILE_BUILT moved to $POOL_PATH"
 

@@ -188,7 +188,11 @@ jobs:
               "${pool_path}" \
               "${package_suffix}" \
               "${LOCAL_PACKAGE_PATH}"
-            checksum=$(sha256sum "${pool_path}/${NEW_PACKAGE_FILE}" | awk '{ print $1 }')
+            echo "build manifest-update file"
+            checksum_file="${tmp_dir}/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
+            echo "checksum file: ${checksum_file}"
+            cat "${checksum_file}"
+            checksum=$(cat "${checksum_file}" | awk -F':' '{print $2}' | xargs)
             package_var="$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g')"
             echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
             echo "${package_var}_name=${PACKAGE_FILE_NAME}" >> $GITHUB_OUTPUT
@@ -253,10 +257,11 @@ jobs:
           output_dir="${{ github.workspace }}/outputs"
           for deb_file in $(find "${output_dir}" -type f -name "*.deb"); do
             cp "${deb_file}" "${POOL_PATH}/"
+            PACKAGE_PATH="${POOL_PATH}/$(basename "${deb_file}")"
             bash "${SCRIPTS_PATH}/archive_packages.sh" \
               "${CURRENT_TRANSMISSION_PATH}" \
               "${ARCHIVE_TRANSMISSION_PATH}" \
-              "${POOL_PATH}/$(basename "${deb_file}")"
+              "${PACKAGE_PATH}"
           done
 
       - name: Build Commit Message
