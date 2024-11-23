@@ -1,0 +1,435 @@
+name: Compile qBittorrent
+
+permissions: write-all
+
+on:
+  schedule:
+    - cron: "0 2 * * 0"
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/qbittorrent.yml'
+
+jobs:
+  qbittorrent:
+    runs-on: ubuntu-24.04
+
+    strategy:
+      max-parallel: 1
+      matrix:
+        qbittorrent_version_major:
+          - v5_0_x
+          - master
+        include:
+          - qbittorrent_version_major: v5_0_x
+            libtorrent_version_major: 2
+            boost_version: 1.83.0
+            boost_platform_version: 22.04
+            qt_version: 6.5.2
+            qbit_ref: v5_0_x
+          - qbittorrent_version_major: master
+            libtorrent_version_major: 2
+            boost_version: 1.83.0
+            boost_platform_version: 22.04
+            qt_version: 6.5.2
+            qbit_ref: master
+
+    env:
+      REPO_PATH: "${{ github.workspace }}/binaries"
+      CURRENT_QBITTORRENT_PATH: "${{ github.workspace }}/binaries/dist/current/qbittorrent"
+      ARCHIVE_QBITTORRENT_PATH: "${{ github.workspace }}/binaries/dist/archive/qbittorrent"
+      POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
+      SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
+      BOOST_PATH: "${{ github.workspace }}/boost"
+      QBITTORRENT_PATH: "${{ github.workspace }}/qBittorrent"
+      HARDEN_FLAGS: "-D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS"
+      TIME_DIFF: 48000
+
+    steps:
+      - name: Update packages
+        run: |
+          sudo apt-get update --fix-missing
+
+      - name: Set up Dependencies for qBittorrent
+        run: |
+          sudo apt-get install -yqq build-essential cmake pkg-config \
+            libcurl4-openssl-dev libssl-dev libevent-dev libminiupnpc-dev \
+            libsystemd-dev zlib1g-dev libnatpmp-dev intltool checkinstall \
+            autoconf automake libtool unzip zip jq \
+            ninja-build libxkbcommon-x11-dev libxcb-cursor-dev \
+            libgl1-mesa-dev
+
+      - name: Checkout Binaries Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ env.REPO_PATH }}
+
+      - name: Determine qBittorrent Version and Updates
+        id: qbittorrent_update
+        env:
+          qbt_ref: ${{ matrix.qbit_ref }}
+          time_diff: ${{ env.TIME_DIFF }}
+        run: |
+          set -e
+          FILE_CONTENT=$(curl -sL "https://raw.githubusercontent.com/qbittorrent/qBittorrent/${qbt_ref}/src/base/version.h.in")
+          QBT_VERSION_MAJOR=$(echo "$FILE_CONTENT" | grep '#define QBT_VERSION_MAJOR' | awk '{print $3}')
+          QBT_VERSION_MINOR=$(echo "$FILE_CONTENT" | grep '#define QBT_VERSION_MINOR' | awk '{print $3}')
+          QBT_VERSION_BUGFIX=$(echo "$FILE_CONTENT" | grep '#define QBT_VERSION_BUGFIX' | awk '{print $3}')
+          QBT_VERSION_STATUS=$(echo "$FILE_CONTENT" | grep '#define QBT_VERSION_STATUS' | awk '{print $3}' | sed 's/"//g')
+          QBT_FULL_VERSION="${QBT_VERSION_MAJOR}.${QBT_VERSION_MINOR}.${QBT_VERSION_BUGFIX}"
+          QBT_SUFFIX=""
+          if [ -n "$QBT_VERSION_STATUS" ] && [ "$QBT_VERSION_STATUS" != "empty" ]; then
+            QBT_FULL_VERSION="${QBT_FULL_VERSION}-${QBT_VERSION_STATUS}"
+            QBT_SUFFIX="-nightly"
+          fi
+          QBT_SHORT_VERSION="${QBT_VERSION_MAJOR}.${QBT_VERSION_MINOR}.${QBT_VERSION_BUGFIX}"
+          QT_VERSION="${{ matrix.qt_version }}"
+          QT_MAJOR_VERSION=$(echo "$QT_VERSION" | cut -d'.' -f1)
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          PACKAGE_NAME="qbittorrent-nox${QBT_SUFFIX}"
+          BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME" "$QBT_FULL_VERSION" "${{ env.CURRENT_QBITTORRENT_PATH }}")
+          ARCHITECTURE="amd64"
+          FULL_VERSION="${QBT_SHORT_VERSION}-1${BUILD_NUMBER}"
+          LIBTORRENT_MAJOR="${{ matrix.libtorrent_version_major }}"
+          LIBTORRENT_PACKAGE_NAME="libtorrent-rasterbar${LIBTORRENT_MAJOR}"
+          for package in libtorrent-rasterbar-dev libtorrent-rasterbar2.0t64 python3-libtorrent; do
+            case $package in
+              libtorrent-rasterbar2.0t64)
+                LIBTORRENT_PACKAGE_NAME=$package
+                LIBTORRENT_PACKAGE_PATH=$(find "${{ env.REPO_PATH }}/dist/current/libtorrent-rasterbar" -name "${package}*" | head -n 1)
+                ;;
+              libtorrent-rasterbar-dev)
+                LIBTORRENT_DEV_PACKAGE_NAME=$package
+                LIBTORRENT_DEV_PACKAGE_PATH=$(find "${{ env.REPO_PATH }}/dist/current/libtorrent-rasterbar" -name "${package}*" | head -n 1)
+                ;;
+              python3-libtorrent)
+                PYTHON_LIBTORRENT_PACKAGE_NAME=$package
+                PYTHON_LIBTORRENT_PACKAGE_PATH=$(find "${{ env.REPO_PATH }}/dist/current/libtorrent-rasterbar" -name "${package}*" | head -n 1)
+                ;;
+            esac
+          done
+          LIBTORRENT_VERSION=$(dpkg-deb -f "$LIBTORRENT_PACKAGE_PATH" Version)
+          LIBTORRENT_VERSION=$(echo "$LIBTORRENT_VERSION" | cut -d'-' -f1)
+          PACKAGE_FILE="${PACKAGE_NAME}_${QBT_FULL_VERSION}_lt${LIBTORRENT_VERSION}_qt${QT_MAJOR_VERSION}-1${BUILD_NUMBER}_${ARCHITECTURE}.deb"
+          COMMIT_DATE=$(curl -s "https://api.github.com/repos/qbittorrent/qBittorrent/branches/${qbt_ref}" | jq -r '.commit.commit.committer.date')
+          COMMIT_TIMESTAMP=$(date -d "$COMMIT_DATE" +%s)
+          CURRENT_TIMESTAMP=$(date +%s)
+          TIMESTAMP_DIFF=$(( (CURRENT_TIMESTAMP - COMMIT_TIMESTAMP) / 3600 ))
+          echo "Latest commit on branch '${qbt_ref}' was $TIMESTAMP_DIFF hours ago."
+          if (( TIMESTAMP_DIFF <= ${time_diff} )); then
+            UPDATE_NEEDED=true
+            echo "Branch '${qbt_ref}' has updates within the last ${time_diff} hours."
+          else
+            if [ ! -f "${{ env.CURRENT_QBITTORRENT_PATH }}/${PACKAGE_FILE}" ]; then
+              echo "Package ${PACKAGE_FILE} does not exist. Update needed."
+              UPDATE_NEEDED=true
+            else
+              echo "Package ${PACKAGE_FILE} already exists. No update needed."
+              UPDATE_NEEDED=false
+            fi
+            echo "No recent updates on branch '${qbt_ref}'."
+          fi
+          TMP_DIR=$(mktemp -d)
+          TMP_DIR=${TMP_DIR##*tmp.}
+          TMP_DIR="${{ env.REPO_PATH }}/$TMP_DIR"
+          mkdir -p $TMP_DIR
+          INSTALL_DIR=$(mktemp -d)
+          INSTALL_DIR=${INSTALL_DIR##*tmp.}
+          INSTALL_DIR="${{ env.QBITTORRENT_PATH }}/$INSTALL_DIR"
+          COMMIT_MESSAGE="Update ${PACKAGE_NAME} to ${QBT_FULL_VERSION} with libtorrent-rasterbar ${LIBTORRENT_VERSION} and Qt ${QT_VERSION} [automated]"
+          variables=(QBT_VERSION_MAJOR qbt_ref QBT_VERSION_MINOR TMP_DIR QBT_VERSION_BUGFIX QBT_VERSION_STATUS QBT_FULL_VERSION QBT_SHORT_VERSION QT_VERSION CURRENT_DATE PACKAGE_NAME BUILD_NUMBER ARCHITECTURE FULL_VERSION LIBTORRENT_MAJOR LIBTORRENT_PACKAGE_NAME LIBTORRENT_PACKAGE_PATH LIBTORRENT_DEV_PACKAGE_NAME LIBTORRENT_DEV_PACKAGE_PATH PYTHON_LIBTORRENT_PACKAGE_NAME PYTHON_LIBTORRENT_PACKAGE_PATH LIBTORRENT_VERSION PACKAGE_FILE COMMIT_DATE COMMIT_TIMESTAMP COMMIT_MESSAGE UPDATE_NEEDED INSTALL_DIR)
+          variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
+          for variable in "${variables_sorted[@]}"; do
+            lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
+            upper_variable=$(echo "$variable" | tr '[:lower:]' '[:upper:]')
+            value="${!variable}"
+            echo "${upper_variable} : ${value}"
+            echo "${lower_variable}=${value}" >> $GITHUB_OUTPUT
+          done
+
+      - uses: tecolicom/actions-use-apt-tools@v1
+        with:
+          tools: build-essential pkg-config autoconf automake libboost-system-dev libtool libssl-dev zlib1g-dev ninja-build libxkbcommon-x11-dev libxcb-cursor-dev ruby-full checkinstall libgl1-mesa-dev cmake
+
+      - name: Setup ccache
+        uses: Chocobo1/setup-ccache-action@v1
+        if: steps.qbittorrent_update.outputs.update_needed == 'true'
+        with:
+          store_cache: ${{ github.ref == 'refs/heads/main' }}
+          update_packager_index: false
+          ccache_options: |
+            max_size=2G
+
+      - name: Install boost
+        uses: MarkusJx/install-boost@v2.4.5
+        id: install-boost
+        if: steps.qbittorrent_update.outputs.update_needed == 'true'
+        with:
+          boost_version: ${{ matrix.boost_version }}
+          boost_install_dir: ${{ env.BOOST_PATH }}
+          platform_version: ${{ matrix.boost_platform_version }}
+
+      - name: Install Custom libtorrent-rasterbar
+        id: libtorrent_rasterbar_install
+        if: steps.qbittorrent_update.outputs.update_needed == 'true'
+        env:
+          libtorrent_file: ${{ steps.qbittorrent_update.outputs.libtorrent_package_path }}
+          libtorrent_dev_file: ${{ steps.qbittorrent_update.outputs.libtorrent_dev_package_path }}
+          python_libtorrent_file: ${{ steps.qbittorrent_update.outputs.python_libtorrent_package_path }}
+        run: |
+          set -e
+          sudo apt-get install -yqq libboost-python1.83.0 libboost-python1.83-dev libboost-system-dev
+          for file in "${libtorrent_file}" "${libtorrent_dev_file}" "${python_libtorrent_file}"; do
+            sudo dpkg -i "${file}"
+          done
+
+      - name: Install Qt
+        if: steps.qbittorrent_update.outputs.update_needed == 'true'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ steps.qbittorrent_update.outputs.qt_version }}
+          archives: icu qtbase qtdeclarative qtsvg qttools
+          cache: true
+
+      - name: Checkout qBittorrent Source Code
+        if: steps.qbittorrent_update.outputs.update_needed == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: qbittorrent/qBittorrent
+          ref: ${{ steps.qbittorrent_update.outputs.qbt_ref }}
+          fetch-depth: 0
+          submodules: recursive
+          path: ${{ env.QBITTORRENT_PATH }}
+
+      - name: Compile qBittorrent-nox
+        if: steps.qbittorrent_update.outputs.update_needed == 'true'
+        env:
+          install_dir: ${{ steps.qbittorrent_update.outputs.install_dir }}
+          qbt_ref: ${{ steps.qbittorrent_update.outputs.qbt_ref }}
+        run: |
+          set -e
+          cd ${{ env.QBITTORRENT_PATH }}
+          cxx_args=(
+            "$CXXFLAGS ${{ env.HARDEN_FLAGS }}" -DQT_FORCE_ASSERTS -Werror
+          )
+          if [[ "${qbt_ref}" != "master" ]]; then
+            cxx_args=("${cxx_args[@]/-Werror}")
+            cxx_args+=(-Wno-error=deprecated-declarations)
+          fi
+          mkdir -p build
+          CXXFLAGS="${cxx_args[*]}" \
+          LDFLAGS="$LDFLAGS -gz" \
+          cmake_args=(
+            -B build
+            -G "Ninja"
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+            -DBOOST_ROOT="${{ env.BOOST_PATH }}"
+            -DCMAKE_INSTALL_PREFIX="${install_dir}"
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo
+            -DTESTING=OFF
+            -DVERBOSE_CONFIGURE=ON
+            -DGUI=OFF
+          )
+          if [[ "${qbt_ref}" != "master" ]]; then
+            cmake_args+=(-DQT6=ON)
+          fi
+          cmake "${cmake_args[@]}"
+          cmake --build build --parallel $(nproc) --target qbt_update_translations
+          cmake --build build --parallel $(nproc)
+          cmake --install build --parallel $(nproc)
+          echo "qbittorrent_compiled=true" >> $GITHUB_OUTPUT
+
+      - name: Generate Deb Files and Package Data
+        id: generate_deb_files
+        if: steps.qbittorrent_update.outputs.update_needed == 'true'
+        env:
+          package_name: ${{ steps.qbittorrent_update.outputs.package_name }}
+          full_version: ${{ steps.qbittorrent_update.outputs.full_version }}
+          current_date: ${{ steps.qbittorrent_update.outputs.current_date }}
+          tmp_dir: ${{ steps.qbittorrent_update.outputs.tmp_dir }}
+          install_dir: ${{ steps.qbittorrent_update.outputs.install_dir }}
+          POOL_PATH: ${{ env.POOL_PATH }}
+          SCRIPTS_PATH: ${{ env.SCRIPTS_PATH }}
+          architecture: ${{ steps.qbittorrent_update.outputs.architecture }}
+          output_dir: ${{ github.workspace }}/outputs
+          LOCAL_PACKAGE_PATH: ${{ env.CURRENT_QBITTORRENT_PATH }}
+        run: |
+          set -e
+          mkdir -p "${output_dir}"
+          artifacts_dir="${{ github.workspace }}/artifacts"
+          mkdir -p "${artifacts_dir}"
+          cd "${tmp_dir}"
+          bash "${SCRIPTS_PATH}/generate_control.sh" \
+            "${package_name}" \
+            "${install_dir}" \
+            "${tmp_dir}" \
+            "${full_version}" \
+            "${current_date}" \
+            "${POOL_PATH}" \
+            "" \
+            "${LOCAL_PACKAGE_PATH}"
+          PACKAGE_FILE="${package_name}_${full_version}_${architecture}.deb"
+          checksum=$(sha256sum "${POOL_PATH}/${PACKAGE_FILE}" | awk '{ print $1 }')
+          echo "${package_name}_checksum=${checksum}" >> $GITHUB_OUTPUT
+          echo "${package_name}_name=${package_name}" >> $GITHUB_OUTPUT
+          echo "${package_name}_version=${full_version}" >> $GITHUB_OUTPUT
+          echo "{
+              \"package_name\": \"${package_name}\",
+              \"checksum\": \"${checksum}\",
+              \"version\": \"${full_version}\",
+              \"category\": \"qbittorrent\",
+              \"build_date\": \"${current_date}\"
+            }" > "${tmp_dir}/${package_name}.json"
+          echo "Uploading artifact for ${package_name}"
+          mkdir -p "${artifacts_dir}/${package_name}"
+          cp "${tmp_dir}/${package_name}.json" "${artifacts_dir}/${package_name}/"
+          cp "${POOL_PATH}/${PACKAGE_FILE}" "${artifacts_dir}/${package_name}/"
+          ls -al "${artifacts_dir}/${package_name}/"
+          cd "${artifacts_dir}"
+          tar -czf "qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}.tar.gz" *
+          echo "qbittorrent_packaged=true" >> $GITHUB_OUTPUT
+
+      - name: Upload Package Data
+        if: steps.generate_deb_files.outputs.qbittorrent_packaged == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}
+          path: ${{ github.workspace }}/artifacts/qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}.tar.gz
+
+  commit_and_push:
+    needs: qbittorrent
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Binaries Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ github.workspace }}/binaries
+
+      - name: Download Package Data Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}
+          path: ${{ github.workspace }}/outputs
+
+      - name: Extract Package Data Artifacts
+        run: |
+          set -e
+          output_dir="${{ github.workspace }}/outputs"
+          tar -xzf "${output_dir}/qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}.tar.gz" -C "${output_dir}"
+
+      - name: Archive and Upload qBittorrent Packages
+        env:
+          REPO_PATH: "${{ github.workspace }}/binaries"
+          CURRENT_QBITTORRENT_PATH: "${{ env.CURRENT_QBITTORRENT_PATH }}"
+          ARCHIVE_QBITTORRENT_PATH: "${{ env.ARCHIVE_QBITTORRENT_PATH }}"
+          POOL_PATH: "${{ env.POOL_PATH }}"
+          SCRIPTS_PATH: "${{ env.SCRIPTS_PATH }}"
+        run: |
+          set -e
+          output_dir="${{ github.workspace }}/outputs"
+          for deb_file in $(find "${output_dir}" -type f -name "*.deb"); do
+            cp "${deb_file}" "${POOL_PATH}/"
+            PACKAGE_PATH="${POOL_PATH}/$(basename "${deb_file}")"
+            bash "${SCRIPTS_PATH}/archive_packages.sh" \
+              "${CURRENT_QBITTORRENT_PATH}" \
+              "${ARCHIVE_QBITTORRENT_PATH}" \
+              "${PACKAGE_PATH}"
+          done
+
+      - name: Build Commit Message
+        id: build_commit_message
+        run: |
+          set -e
+          output_dir="${{ github.workspace }}/outputs"
+          commit_description=""
+          for json_file in $(find "${output_dir}" -type f -name "*.json"); do
+            package_data=$(cat "${json_file}")
+            package_name=$(echo "${package_data}" | jq -r '.package_name')
+            package_version=$(echo "${package_data}" | jq -r '.version')
+            commit_description="${commit_description}
+            - ${package_name} updated to ${package_version}"
+          done
+          commit_message="Update qBittorrent packages [automated]"
+          echo "Commit message is:"
+          echo "${commit_message}${commit_description}"
+          echo "commit_message<<EOF" >> $GITHUB_OUTPUT
+          echo "${commit_message}${commit_description}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Commit and Push qBittorrent Packages
+        uses: EndBug/add-and-commit@v9
+        env:
+          commit_message: "${{ steps.build_commit_message.outputs.commit_message }}"
+          author_email: "${{ secrets.COMMITTER_EMAIL }}"
+          author_name: "${{ secrets.COMMITTER_NAME }}"
+        with:
+          author_name: "${{ env.author_name }}"
+          author_email: "${{ env.author_email }}"
+          default_author: user_info
+          message: ${{ env.commit_message }}
+          cwd: "./binaries"
+          add: |
+            dist/current/qbittorrent/
+            dist/archive/qbittorrent/
+          push: true
+          pull: "--rebase --autostash"
+
+  trigger_manifest_update:
+    needs: [qbittorrent, commit_and_push]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Binaries Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ${{ github.workspace }}/binaries
+
+      - name: Download Package Data Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}
+          path: ${{ github.workspace }}/outputs
+
+      - name: Extract Package Data Artifacts
+        run: |
+          set -e
+          output_dir="${{ github.workspace }}/outputs"
+          tar -xzf "${output_dir}/qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}.tar.gz" -C "${output_dir}"
+
+      - name: Collect Outputs
+        id: collect_outputs
+        run: |
+          set -e
+          output_dir="${{ github.workspace }}/outputs"
+          manifest_updates="{\"package_updates\": {}}"
+          for json_file in $(find "${output_dir}" -type f -name "*.json"); do
+            package_data=$(cat "${json_file}")
+            package_name=$(echo "${package_data}" | jq -r '.package_name')
+            manifest_updates=$(echo "${manifest_updates}" | jq ".package_updates += {\"${package_name}\": ${package_data}}")
+          done
+          echo "${manifest_updates}" > "${output_dir}/manifest_updates.json"
+          echo "manifest_updates<<EOF" >> $GITHUB_OUTPUT
+          echo "${manifest_updates}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Trigger Update Manifest Workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: update-manifest
+          client-payload: ${{ steps.collect_outputs.outputs.manifest_updates }}
+
+      - name: Trigger Create Release Workflow
+        uses: peter-evans/repository-dispatch@v3
+        env:
+          package_name: "${{ steps.qbittorrent_update.outputs.package_name }}"
+          package_version: ${{ steps.qbittorrent_update.outputs.full_version }}
+        with:
+          event-type: create-release
+          client-payload: |
+            {
+              "package_name": "${{ env.package_name }}",
+              "package_version": "${{ env.package_version }}"
+            }
