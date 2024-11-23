@@ -139,7 +139,7 @@ jobs:
           INSTALL_DIR=${INSTALL_DIR##*tmp.}
           INSTALL_DIR="${{ env.QBITTORRENT_PATH }}/$INSTALL_DIR"
           COMMIT_MESSAGE="Update ${PACKAGE_NAME} to ${QBT_FULL_VERSION} with libtorrent-rasterbar ${LIBTORRENT_VERSION} and Qt ${QT_VERSION} [automated]"
-          variables=(QBT_VERSION_MAJOR qbt_ref QBT_VERSION_MINOR TMP_DIR QBT_VERSION_BUGFIX QBT_VERSION_STATUS QBT_FULL_VERSION QBT_SHORT_VERSION QT_VERSION CURRENT_DATE PACKAGE_NAME BUILD_NUMBER ARCHITECTURE FULL_VERSION LIBTORRENT_MAJOR LIBTORRENT_PACKAGE_NAME LIBTORRENT_PACKAGE_PATH LIBTORRENT_DEV_PACKAGE_NAME LIBTORRENT_DEV_PACKAGE_PATH PYTHON_LIBTORRENT_PACKAGE_NAME PYTHON_LIBTORRENT_PACKAGE_PATH LIBTORRENT_VERSION PACKAGE_FILE COMMIT_DATE COMMIT_TIMESTAMP COMMIT_MESSAGE UPDATE_NEEDED INSTALL_DIR)
+          variables=(QBT_VERSION_MAJOR qbt_ref QBT_VERSION_MINOR TMP_DIR QBT_SUFFIX QBT_VERSION_BUGFIX QBT_VERSION_STATUS QBT_FULL_VERSION QBT_SHORT_VERSION QT_VERSION CURRENT_DATE PACKAGE_NAME BUILD_NUMBER ARCHITECTURE FULL_VERSION LIBTORRENT_MAJOR LIBTORRENT_PACKAGE_NAME LIBTORRENT_PACKAGE_PATH LIBTORRENT_DEV_PACKAGE_NAME LIBTORRENT_DEV_PACKAGE_PATH PYTHON_LIBTORRENT_PACKAGE_NAME PYTHON_LIBTORRENT_PACKAGE_PATH LIBTORRENT_VERSION PACKAGE_FILE COMMIT_DATE COMMIT_TIMESTAMP COMMIT_MESSAGE UPDATE_NEEDED INSTALL_DIR)
           variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
           for variable in "${variables_sorted[@]}"; do
             lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
@@ -255,6 +255,7 @@ jobs:
           architecture: ${{ steps.qbittorrent_update.outputs.architecture }}
           output_dir: ${{ github.workspace }}/outputs
           LOCAL_PACKAGE_PATH: ${{ env.CURRENT_QBITTORRENT_PATH }}
+          qbt_suffix: ${{ steps.qbittorrent_update.outputs.qbt_suffix }}
         run: |
           set -e
           mkdir -p "${output_dir}"
@@ -263,6 +264,7 @@ jobs:
           cd "${tmp_dir}"
           sudo apt-get update
           apt-get download "${package_name}"
+          PACKAGE_NAME_WITH_SUFFIX="${package_name}${qbt_suffix}"
           bash "${SCRIPTS_PATH}/generate_control.sh" \
             "${package_name}" \
             "${install_dir}" \
