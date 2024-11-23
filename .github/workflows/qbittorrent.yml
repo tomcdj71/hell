@@ -282,21 +282,41 @@ jobs:
               \"category\": \"qbittorrent\",
               \"build_date\": \"${current_date}\"
             }" > "${tmp_dir}/${package_name}.json"
-          echo "Uploading artifact for ${package_name}"
-          mkdir -p "${artifacts_dir}/${package_name}"
-          cp "${tmp_dir}/${package_name}.json" "${artifacts_dir}/${package_name}/"
-          cp "${POOL_PATH}/${PACKAGE_FILE}" "${artifacts_dir}/${package_name}/"
-          ls -al "${artifacts_dir}/${package_name}/"
-          cd "${artifacts_dir}"
-          tar -czf "qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}.tar.gz" *
+          echo "build manifest-update file"
+          checksum_file="${tmp_dir}/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
+          echo "checksum file: ${checksum_file}"
+          cat "${checksum_file}"
+          checksum=$(cat "${checksum_file}" | awk -F':' '{print $2}' | xargs)
+          package_var="$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g')"
+          echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
+          echo "${package_var}_name=${PACKAGE_FILE_NAME}" >> $GITHUB_OUTPUT
+          echo "${package_var}_version=${full_version}" >> $GITHUB_OUTPUT
+          echo "{
+              \"package_name\": \"${PACKAGE_FILE_NAME}\",
+              \"checksum\": \"${checksum}\",
+              \"version\": \"${full_version}\",
+              \"category\": \"transmission\",
+              \"build_date\": \"${current_date}\"
+            }" > "${tmp_dir}/${PACKAGE_FILE_NAME}.json"
+          echo "Uploading artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
+          mkdir -p "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}"
+          cp "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+          file=$(find ${pool_path} -type f -name "${PACKAGE_NAME}*")
+          cp "${file}" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+          ls -al "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+          tar -czf "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}.tar.gz" -C "${artifacts_dir}" "${PACKAGE_NAME_WITH_SUFFIX}"
+          rm -rf "${artifacts_dir:?}/${PACKAGE_NAME_WITH_SUFFIX}"
+          echo "Uploaded artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
           echo "qbittorrent_packaged=true" >> $GITHUB_OUTPUT
 
       - name: Upload Package Data
         if: steps.generate_deb_files.outputs.qbittorrent_packaged == 'true'
         uses: actions/upload-artifact@v4
+        env:
+          qbt_full_version: ${{ steps.qbittorrent_update.outputs.full_version }}
         with:
-          name: qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}
-          path: ${{ github.workspace }}/artifacts/qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}.tar.gz
+          name: qbittorrent-${qbt_full_version}
+          path: ${{ github.workspace }}/artifacts
 
   commit_and_push:
     needs: qbittorrent
@@ -311,14 +331,13 @@ jobs:
       - name: Download Package Data Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}
           path: ${{ github.workspace }}/outputs
 
       - name: Extract Package Data Artifacts
         run: |
           set -e
           output_dir="${{ github.workspace }}/outputs"
-          tar -xzf "${output_dir}/qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}.tar.gz" -C "${output_dir}"
+          find "${output_dir}" -type f -name "*.tar.gz" -exec tar -xzf {} -C "${output_dir}" \;
 
       - name: Archive and Upload qBittorrent Packages
         env:
@@ -329,6 +348,7 @@ jobs:
           SCRIPTS_PATH: "${{ env.SCRIPTS_PATH }}"
         run: |
           set -e
+          mkdir -p "${POOL_PATH}"
           output_dir="${{ github.workspace }}/outputs"
           for deb_file in $(find "${output_dir}" -type f -name "*.deb"); do
             cp "${deb_file}" "${POOL_PATH}/"
@@ -387,17 +407,11 @@ jobs:
           fetch-depth: 0
           path: ${{ github.workspace }}/binaries
 
-      - name: Download Package Data Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}
-          path: ${{ github.workspace }}/outputs
-
       - name: Extract Package Data Artifacts
         run: |
           set -e
           output_dir="${{ github.workspace }}/outputs"
-          tar -xzf "${output_dir}/qbittorrent-artifacts-${{ matrix.qbittorrent_version_major }}.tar.gz" -C "${output_dir}"
+          find "${output_dir}" -type f -name "*.tar.gz" -exec tar -xzf {} -C "${output_dir}" \;
 
       - name: Collect Outputs
         id: collect_outputs
