@@ -267,7 +267,7 @@ jobs:
       - name: Build Commit Message
         id: build_commit_message
         run: |
-          set -e
+          set -e 
           output_dir="${{ github.workspace }}/outputs"
           commit_description=""
           for json_file in $(find "${output_dir}" -type f -name "*.json"); do
