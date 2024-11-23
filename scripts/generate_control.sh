@@ -60,7 +60,7 @@ if [[ "$PACKAGE_NAME" == "libtorrent22" || ("$PACKAGE_NAME" == "libtorrent-dev" 
   PACKAGE_FILE="$TMPDIR/$(basename "$PACKAGE_FILE")"
 else
   PACKAGE_NAME="${PACKAGE_NAME//-nightly/}"
-  PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}_*.deb" -print -quit)
+  PACKAGE_FILE=$(find "$TMPDIR" -type f -name "${PACKAGE_NAME}*.deb" -print -quit)
   if [ -z "$PACKAGE_FILE" ]; then
     echo "Error: Package file for $PACKAGE_NAME not found in $TMPDIR"
     echo "Contents of TMPDIR:"

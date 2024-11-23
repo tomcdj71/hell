@@ -261,6 +261,8 @@ jobs:
           artifacts_dir="${{ github.workspace }}/artifacts"
           mkdir -p "${artifacts_dir}"
           cd "${tmp_dir}"
+          sudo apt-get update
+          apt-get download "${package_name}"
           bash "${SCRIPTS_PATH}/generate_control.sh" \
             "${package_name}" \
             "${install_dir}" \
