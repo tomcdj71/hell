@@ -305,7 +305,7 @@ jobs:
           echo "Uploading artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
           mkdir -p "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}"
           cp "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
-          file=$(find ${pool_path} -type f -name "${PACKAGE_NAME}*")
+          file=$(find ${pool_path} -type f -name "${PACKAGE_NAME}*.deb")
           cp "${file}" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
           ls -al "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
           tar -czf "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}.tar.gz" -C "${artifacts_dir}" "${PACKAGE_NAME_WITH_SUFFIX}"
