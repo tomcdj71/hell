@@ -282,23 +282,16 @@ jobs:
             "${pool_path}" \
             "${qbt_suffix}" \
             "${LOCAL_PACKAGE_PATH}"
-          PACKAGE_FILE="${package_name}_${full_version}_${architecture}.deb"
-          checksum=$(sha256sum "${POOL_PATH}/${PACKAGE_FILE}" | awk '{ print $1 }')
-          echo "${package_name}_checksum=${checksum}" >> $GITHUB_OUTPUT
-          echo "${package_name}_name=${package_name}" >> $GITHUB_OUTPUT
-          echo "${package_name}_version=${full_version}" >> $GITHUB_OUTPUT
-          echo "{
-              \"package_name\": \"${package_name}\",
-              \"checksum\": \"${checksum}\",
-              \"version\": \"${full_version}\",
-              \"category\": \"qbittorrent\",
-              \"build_date\": \"${current_date}\"
-            }" > "${tmp_dir}/${package_name}.json"
-          echo "build manifest-update file"
-          checksum_file="${tmp_dir}/checksums/${package_name_with_suffix}.sha256"
-          echo "checksum file: ${checksum_file}"
-          cat "${checksum_file}"
-          checksum=$(cat "${checksum_file}" | awk -F':' '{print $2}' | xargs)
+          PACKAGE_FILE="${package_name_with_suffix}_${full_version}_${architecture}.deb"
+          if [ ! -f "${pool_path}/${PACKAGE_FILE}" ]; then
+            echo "Error: Package file ${PACKAGE_FILE} not found in ${pool_path}"
+            exit 1
+          fi
+          checksum=$(sha256sum "${pool_path}/${PACKAGE_FILE}" | awk '{ print $1 }')
+          if [ -z "${checksum}" ]; then
+            echo "Error: Checksum is empty for ${PACKAGE_FILE}"
+            exit 1
+          fi
           package_var="$(echo "${package_name_with_suffix}" | sed 's/[-.]/_/g')"
           echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
           echo "${package_var}_name=${package_name_with_suffix}" >> $GITHUB_OUTPUT
@@ -307,14 +300,13 @@ jobs:
               \"package_name\": \"${package_name_with_suffix}\",
               \"checksum\": \"${checksum}\",
               \"version\": \"${full_version}\",
-              \"category\": \"transmission\",
+              \"category\": \"qbittorrent\",
               \"build_date\": \"${current_date}\"
             }" > "${tmp_dir}/${package_name_with_suffix}.json"
           echo "Uploading artifact for ${package_name_with_suffix}"
           mkdir -p "${artifacts_dir}/${package_name_with_suffix}"
           cp "${tmp_dir}/${package_name_with_suffix}.json" "${artifacts_dir}/${package_name_with_suffix}/"
-          file=$(find ${pool_path} -type f -name "${package_name_with_suffix}*.deb")
-          cp "${file}" "${artifacts_dir}/${package_name_with_suffix}/"
+          cp "${pool_path}/${PACKAGE_FILE}" "${artifacts_dir}/${package_name_with_suffix}/"
           ls -al "${artifacts_dir}/${package_name_with_suffix}/"
           tar -czf "${artifacts_dir}/${package_name_with_suffix}.tar.gz" -C "${artifacts_dir}" "${package_name_with_suffix}"
           rm -rf "${artifacts_dir:?}/${package_name_with_suffix}"
