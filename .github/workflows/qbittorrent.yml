@@ -319,7 +319,7 @@ jobs:
         env:
           package_name_with_suffix: ${{ steps.qbittorrent_update.outputs.package_name_with_suffix }}
         with:
-          name: ${package_name_with_suffix}
+          name: ${{ steps.qbittorrent_update.outputs.package_name_with_suffix }}
           path: ${{ github.workspace }}/artifacts
 
   commit_and_push:
