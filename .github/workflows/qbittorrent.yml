@@ -305,7 +305,8 @@ jobs:
             }" > "${tmp_dir}/${package_name_with_suffix}.json"
           echo "Uploading artifact for ${package_name_with_suffix}"
           mkdir -p "${artifacts_dir}/${package_name_with_suffix}"
-          tar -czf "${artifacts_dir}/qt-6.5.2.tar.gz" -C "${QT_ROOT_DIR}" . || echo "Failed to create qt-6.5.2.tar.gz"
+          if [ ! -f "${artifacts_dir}/qt-6.5.2.tar.gz" ]; then
+            tar -czf "${artifacts_dir}/qt-6.5.2.tar.gz" -C "${QT_ROOT_DIR}" . || echo "Failed to create qt-6.5.2.tar.gz"
           cp "${tmp_dir}/${package_name_with_suffix}.json" "${artifacts_dir}/${package_name_with_suffix}/"
           cp "${pool_path}/${PACKAGE_FILE}" "${artifacts_dir}/${package_name_with_suffix}/"
           ls -al "${artifacts_dir}/${package_name_with_suffix}/"
@@ -416,12 +417,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ${{ github.workspace }}/outputs
-          
+
       - name: Extract Package Data Artifacts
         run: |
           set -e
           output_dir="${{ github.workspace }}/outputs"
           find "${output_dir}" -type f -name "*.tar.gz" -exec tar -xzf {} -C "${output_dir}" \;
+          rm -rf qt*
 
       - name: Collect Outputs
         id: collect_outputs

@@ -143,6 +143,8 @@ if [ "$NO_CHECK" = false ]; then
   control_file="DEBIAN/control"
   old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
   echo "Performing rsync to merge installation files..."
+  echo "content of $INSTALL_DIR:"
+  tree -L 5 "$INSTALL_DIR"
   rsync -auv --existing "$INSTALL_DIR/" "./"
   if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
     echo "Creating symlink for libtorrent22"
