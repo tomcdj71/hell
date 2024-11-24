@@ -273,6 +273,7 @@ jobs:
           cd "${tmp_dir}"
           sudo apt-get update
           apt-get download "${package_name}"
+          tree -L 5 ${{ github.workspace }}/qBittorrent"
           bash "${SCRIPTS_PATH}/generate_control.sh" \
             "${package_name}" \
             "${install_dir}" \
