@@ -273,7 +273,7 @@ jobs:
             "${full_version}" \
             "${current_date}" \
             "${pool_path}" \
-            "${package_suffix}" \
+            "${qbt_suffix}" \
             "${LOCAL_PACKAGE_PATH}"
           PACKAGE_FILE="${package_name}_${full_version}_${architecture}.deb"
           checksum=$(sha256sum "${POOL_PATH}/${PACKAGE_FILE}" | awk '{ print $1 }')
