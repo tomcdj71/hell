@@ -248,7 +248,7 @@ jobs:
         env:
           package_name: ${{ steps.qbittorrent_update.outputs.package_name }}
           package_name_with_suffix: ${{ steps.qbittorrent_update.outputs.package_name_with_suffix }}
-          full_version: ${{ steps.qbittorrent_update.outputs.full_version }}
+          full_version: ${{ steps.qbittorrent_update.outputs.builded_version }}
           current_date: ${{ steps.qbittorrent_update.outputs.current_date }}
           tmp_dir: ${{ steps.qbittorrent_update.outputs.tmp_dir }}
           install_dir: ${{ steps.qbittorrent_update.outputs.install_dir }}
