@@ -78,21 +78,21 @@ jobs:
           QBT_VERSION_MINOR=$(echo "$FILE_CONTENT" | grep '#define QBT_VERSION_MINOR' | awk '{print $3}')
           QBT_VERSION_BUGFIX=$(echo "$FILE_CONTENT" | grep '#define QBT_VERSION_BUGFIX' | awk '{print $3}')
           QBT_VERSION_STATUS=$(echo "$FILE_CONTENT" | grep '#define QBT_VERSION_STATUS' | awk '{print $3}' | sed 's/"//g')
-          QBT_FULL_VERSION="${QBT_VERSION_MAJOR}.${QBT_VERSION_MINOR}.${QBT_VERSION_BUGFIX}"
+          QBT_SHORT_VERSION="${QBT_VERSION_MAJOR}.${QBT_VERSION_MINOR}.${QBT_VERSION_BUGFIX}"
+          QBT_FULL_VERSION="${QBT_SHORT_VERSION}"
           QBT_SUFFIX=""
           if [ -n "$QBT_VERSION_STATUS" ] && [ "$QBT_VERSION_STATUS" != "empty" ]; then
-            QBT_FULL_VERSION="${QBT_FULL_VERSION}-${QBT_VERSION_STATUS}"
+            QBT_FULL_VERSION="${QBT_SHORT_VERSION}-${QBT_VERSION_STATUS}"
             QBT_SUFFIX="-nightly"
           fi
-          QBT_SHORT_VERSION="${QBT_VERSION_MAJOR}.${QBT_VERSION_MINOR}.${QBT_VERSION_BUGFIX}"
-          QT_VERSION="${{ matrix.qt_version }}"
-          QT_MAJOR_VERSION=$(echo "$QT_VERSION" | cut -d'.' -f1)
-          CURRENT_DATE=$(date +%Y-%m-%d)
           PACKAGE_NAME="qbittorrent-nox"
           PACKAGE_NAME_WITH_SUFFIX="${PACKAGE_NAME}${QBT_SUFFIX}"
           BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME" "$QBT_FULL_VERSION" "${{ env.CURRENT_QBITTORRENT_PATH }}")
           ARCHITECTURE="amd64"
-          FULL_VERSION="${QBT_SHORT_VERSION}-1${BUILD_NUMBER}"
+          BUILDED_VERSION="${QBT_SHORT_VERSION}-1${BUILD_NUMBER}"
+          QT_VERSION="${{ matrix.qt_version }}"
+          QT_MAJOR_VERSION=$(echo "$QT_VERSION" | cut -d'.' -f1)
+          CURRENT_DATE=$(date +%Y-%m-%d)
           LIBTORRENT_MAJOR="${{ matrix.libtorrent_version_major }}"
           LIBTORRENT_PACKAGE_NAME="libtorrent-rasterbar${LIBTORRENT_MAJOR}"
           for package in libtorrent-rasterbar-dev libtorrent-rasterbar2.0t64 python3-libtorrent; do
@@ -140,7 +140,7 @@ jobs:
           INSTALL_DIR=${INSTALL_DIR##*tmp.}
           INSTALL_DIR="${{ env.QBITTORRENT_PATH }}/$INSTALL_DIR"
           COMMIT_MESSAGE="Update ${PACKAGE_NAME} to ${QBT_FULL_VERSION} with libtorrent-rasterbar ${LIBTORRENT_VERSION} and Qt ${QT_VERSION} [automated]"
-          variables=(QBT_VERSION_MAJOR qbt_ref QBT_VERSION_MINOR TMP_DIR PACKAGE_NAME_WITH_SUFFIX QBT_SUFFIX QBT_VERSION_BUGFIX QBT_VERSION_STATUS QBT_FULL_VERSION QBT_SHORT_VERSION QT_VERSION CURRENT_DATE PACKAGE_NAME BUILD_NUMBER ARCHITECTURE FULL_VERSION LIBTORRENT_MAJOR LIBTORRENT_PACKAGE_NAME LIBTORRENT_PACKAGE_PATH LIBTORRENT_DEV_PACKAGE_NAME LIBTORRENT_DEV_PACKAGE_PATH PYTHON_LIBTORRENT_PACKAGE_NAME PYTHON_LIBTORRENT_PACKAGE_PATH LIBTORRENT_VERSION PACKAGE_FILE COMMIT_DATE COMMIT_TIMESTAMP COMMIT_MESSAGE UPDATE_NEEDED INSTALL_DIR)
+          variables=(QBT_VERSION_MAJOR qbt_ref QBT_VERSION_MINOR TMP_DIR BUILDED_VERSION PACKAGE_NAME_WITH_SUFFIX QBT_SUFFIX QBT_VERSION_BUGFIX QBT_VERSION_STATUS QBT_FULL_VERSION QBT_SHORT_VERSION QT_VERSION CURRENT_DATE PACKAGE_NAME BUILD_NUMBER ARCHITECTURE LIBTORRENT_MAJOR LIBTORRENT_PACKAGE_NAME LIBTORRENT_PACKAGE_PATH LIBTORRENT_DEV_PACKAGE_NAME LIBTORRENT_DEV_PACKAGE_PATH PYTHON_LIBTORRENT_PACKAGE_NAME PYTHON_LIBTORRENT_PACKAGE_PATH LIBTORRENT_VERSION PACKAGE_FILE COMMIT_DATE COMMIT_TIMESTAMP COMMIT_MESSAGE UPDATE_NEEDED INSTALL_DIR)
           variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
           for variable in "${variables_sorted[@]}"; do
             lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
@@ -318,9 +318,9 @@ jobs:
         if: steps.generate_deb_files.outputs.qbittorrent_packaged == 'true'
         uses: actions/upload-artifact@v4
         env:
-          qbt_full_version: ${{ steps.qbittorrent_update.outputs.full_version }}
+          qbt_short_version: ${{ steps.qbittorrent_update.outputs.qbt_short_version }}
         with:
-          name: qbittorrent-${qbt_full_version}
+          name: qbittorrent-${qbt_short_version}
           path: ${{ github.workspace }}/artifacts
 
   commit_and_push:
