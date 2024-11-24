@@ -144,11 +144,21 @@ if [ "$NO_CHECK" = false ]; then
   old_installed_size=$(grep "^Installed-Size:" "$control_file" | awk '{print $2}')
   echo "Performing rsync to merge installation files..."
   echo "content of $INSTALL_DIR:"
-  tree -L 5 "$INSTALL_DIR"
   rsync -auv --existing "$INSTALL_DIR/" "./"
   if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
     echo "Creating symlink for libtorrent22"
     [ ! -e usr/lib/x86_64-linux-gnu/libtorrent.so ] && ln -s usr/lib/x86_64-linux-gnu/libtorrent.so.22.0.0 usr/lib/x86_64-linux-gnu/libtorrent.so
+  fi
+  if [ "$PACKAGE_NAME" == "qbittorrent-nox" ]; then
+    new_qbittorrent_nox=$(find "$INSTALL_DIR" -type f -name "qbittorrent-nox")
+    if [ -n "$new_qbittorrent_nox" ]; then
+      echo "Replacing qbittorrent-nox binary"
+      rm -f usr/bin/qbittorrent-nox
+      cp "$new_qbittorrent_nox" usr/bin/
+    else
+      echo "Error: qbittorrent-nox binary not found in $INSTALL_DIR"
+      exit 1
+    fi
   fi
   installed_size=$(du -sk . | cut -f1)
   echo "Old Installed-Size: $old_installed_size kB"

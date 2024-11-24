@@ -308,6 +308,7 @@ jobs:
           mkdir -p "${artifacts_dir}/${package_name_with_suffix}"
           if [ ! -f "${artifacts_dir}/qt-6.5.2.tar.gz" ]; then
             tar -czf "${artifacts_dir}/qt-6.5.2.tar.gz" -C "${QT_ROOT_DIR}" . || echo "Failed to create qt-6.5.2.tar.gz"
+          fi
           cp "${tmp_dir}/${package_name_with_suffix}.json" "${artifacts_dir}/${package_name_with_suffix}/"
           cp "${pool_path}/${PACKAGE_FILE}" "${artifacts_dir}/${package_name_with_suffix}/"
           ls -al "${artifacts_dir}/${package_name_with_suffix}/"
