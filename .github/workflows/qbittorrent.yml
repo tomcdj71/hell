@@ -346,10 +346,10 @@ jobs:
       - name: Archive and Upload qBittorrent Packages
         env:
           REPO_PATH: "${{ github.workspace }}/binaries"
-          CURRENT_QBITTORRENT_PATH: "${{ env.CURRENT_QBITTORRENT_PATH }}"
-          ARCHIVE_QBITTORRENT_PATH: "${{ env.ARCHIVE_QBITTORRENT_PATH }}"
-          POOL_PATH: "${{ env.POOL_PATH }}"
-          SCRIPTS_PATH: "${{ env.SCRIPTS_PATH }}"
+          CURRENT_TRANSMISSION_PATH: "${{ github.workspace }}/binaries/dist/current/transmission"
+          ARCHIVE_TRANSMISSION_PATH: "${{ github.workspace }}/binaries/dist/archive/transmission"
+          POOL_PATH: "${{ github.workspace }}/binaries/dist/pool"
+          SCRIPTS_PATH: "${{ github.workspace }}/binaries/scripts"
         run: |
           set -e
           mkdir -p "${POOL_PATH}"
