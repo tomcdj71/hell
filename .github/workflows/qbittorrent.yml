@@ -88,7 +88,8 @@ jobs:
           QT_VERSION="${{ matrix.qt_version }}"
           QT_MAJOR_VERSION=$(echo "$QT_VERSION" | cut -d'.' -f1)
           CURRENT_DATE=$(date +%Y-%m-%d)
-          PACKAGE_NAME="qbittorrent-nox${QBT_SUFFIX}"
+          PACKAGE_NAME="qbittorrent-nox"
+          PACKAGE_NAME_WITH_SUFFIX="${PACKAGE_NAME}${QBT_SUFFIX}"
           BUILD_NUMBER=$(bash ${{ env.SCRIPTS_PATH }}/increment_revision.sh "$PACKAGE_NAME" "$QBT_FULL_VERSION" "${{ env.CURRENT_QBITTORRENT_PATH }}")
           ARCHITECTURE="amd64"
           FULL_VERSION="${QBT_SHORT_VERSION}-1${BUILD_NUMBER}"
@@ -139,7 +140,7 @@ jobs:
           INSTALL_DIR=${INSTALL_DIR##*tmp.}
           INSTALL_DIR="${{ env.QBITTORRENT_PATH }}/$INSTALL_DIR"
           COMMIT_MESSAGE="Update ${PACKAGE_NAME} to ${QBT_FULL_VERSION} with libtorrent-rasterbar ${LIBTORRENT_VERSION} and Qt ${QT_VERSION} [automated]"
-          variables=(QBT_VERSION_MAJOR qbt_ref QBT_VERSION_MINOR TMP_DIR QBT_SUFFIX QBT_VERSION_BUGFIX QBT_VERSION_STATUS QBT_FULL_VERSION QBT_SHORT_VERSION QT_VERSION CURRENT_DATE PACKAGE_NAME BUILD_NUMBER ARCHITECTURE FULL_VERSION LIBTORRENT_MAJOR LIBTORRENT_PACKAGE_NAME LIBTORRENT_PACKAGE_PATH LIBTORRENT_DEV_PACKAGE_NAME LIBTORRENT_DEV_PACKAGE_PATH PYTHON_LIBTORRENT_PACKAGE_NAME PYTHON_LIBTORRENT_PACKAGE_PATH LIBTORRENT_VERSION PACKAGE_FILE COMMIT_DATE COMMIT_TIMESTAMP COMMIT_MESSAGE UPDATE_NEEDED INSTALL_DIR)
+          variables=(QBT_VERSION_MAJOR qbt_ref QBT_VERSION_MINOR TMP_DIR PACKAGE_NAME_WITH_SUFFIX QBT_SUFFIX QBT_VERSION_BUGFIX QBT_VERSION_STATUS QBT_FULL_VERSION QBT_SHORT_VERSION QT_VERSION CURRENT_DATE PACKAGE_NAME BUILD_NUMBER ARCHITECTURE FULL_VERSION LIBTORRENT_MAJOR LIBTORRENT_PACKAGE_NAME LIBTORRENT_PACKAGE_PATH LIBTORRENT_DEV_PACKAGE_NAME LIBTORRENT_DEV_PACKAGE_PATH PYTHON_LIBTORRENT_PACKAGE_NAME PYTHON_LIBTORRENT_PACKAGE_PATH LIBTORRENT_VERSION PACKAGE_FILE COMMIT_DATE COMMIT_TIMESTAMP COMMIT_MESSAGE UPDATE_NEEDED INSTALL_DIR)
           variables_sorted=($(printf "%s\n" "${variables[@]}" | sort))
           for variable in "${variables_sorted[@]}"; do
             lower_variable=$(echo "$variable" | tr '[:upper:]' '[:lower:]')
@@ -246,11 +247,12 @@ jobs:
         if: steps.qbittorrent_update.outputs.update_needed == 'true'
         env:
           package_name: ${{ steps.qbittorrent_update.outputs.package_name }}
+          package_name_with_suffix: ${{ steps.qbittorrent_update.outputs.package_name_with_suffix }}
           full_version: ${{ steps.qbittorrent_update.outputs.full_version }}
           current_date: ${{ steps.qbittorrent_update.outputs.current_date }}
           tmp_dir: ${{ steps.qbittorrent_update.outputs.tmp_dir }}
           install_dir: ${{ steps.qbittorrent_update.outputs.install_dir }}
-          POOL_PATH: ${{ env.POOL_PATH }}
+          pool_path: ${{ env.POOL_PATH }}
           SCRIPTS_PATH: ${{ env.SCRIPTS_PATH }}
           architecture: ${{ steps.qbittorrent_update.outputs.architecture }}
           output_dir: ${{ github.workspace }}/outputs
@@ -264,15 +266,14 @@ jobs:
           cd "${tmp_dir}"
           sudo apt-get update
           apt-get download "${package_name}"
-          PACKAGE_NAME_WITH_SUFFIX="${package_name}${qbt_suffix}"
           bash "${SCRIPTS_PATH}/generate_control.sh" \
             "${package_name}" \
             "${install_dir}" \
             "${tmp_dir}" \
             "${full_version}" \
             "${current_date}" \
-            "${POOL_PATH}" \
-            "" \
+            "${pool_path}" \
+            "${package_suffix}" \
             "${LOCAL_PACKAGE_PATH}"
           PACKAGE_FILE="${package_name}_${full_version}_${architecture}.deb"
           checksum=$(sha256sum "${POOL_PATH}/${PACKAGE_FILE}" | awk '{ print $1 }')
@@ -287,30 +288,30 @@ jobs:
               \"build_date\": \"${current_date}\"
             }" > "${tmp_dir}/${package_name}.json"
           echo "build manifest-update file"
-          checksum_file="${tmp_dir}/checksums/${PACKAGE_NAME_WITH_SUFFIX}.sha256"
+          checksum_file="${tmp_dir}/checksums/${package_name_with_suffix}.sha256"
           echo "checksum file: ${checksum_file}"
           cat "${checksum_file}"
           checksum=$(cat "${checksum_file}" | awk -F':' '{print $2}' | xargs)
-          package_var="$(echo "${PACKAGE_FILE_NAME}" | sed 's/[-.]/_/g')"
+          package_var="$(echo "${package_name_with_suffix}" | sed 's/[-.]/_/g')"
           echo "${package_var}_checksum=${checksum}" >> $GITHUB_OUTPUT
-          echo "${package_var}_name=${PACKAGE_FILE_NAME}" >> $GITHUB_OUTPUT
+          echo "${package_var}_name=${package_name_with_suffix}" >> $GITHUB_OUTPUT
           echo "${package_var}_version=${full_version}" >> $GITHUB_OUTPUT
           echo "{
-              \"package_name\": \"${PACKAGE_FILE_NAME}\",
+              \"package_name\": \"${package_name_with_suffix}\",
               \"checksum\": \"${checksum}\",
               \"version\": \"${full_version}\",
               \"category\": \"transmission\",
               \"build_date\": \"${current_date}\"
             }" > "${tmp_dir}/${PACKAGE_FILE_NAME}.json"
-          echo "Uploading artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
-          mkdir -p "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}"
-          cp "${tmp_dir}/${PACKAGE_NAME_WITH_SUFFIX}.json" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
+          echo "Uploading artifact for ${package_name_with_suffix}"
+          mkdir -p "${artifacts_dir}/${package_name_with_suffix}"
+          cp "${tmp_dir}/${package_name_with_suffix}.json" "${artifacts_dir}/${package_name_with_suffix}/"
           file=$(find ${pool_path} -type f -name "${PACKAGE_NAME}*.deb")
-          cp "${file}" "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
-          ls -al "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}/"
-          tar -czf "${artifacts_dir}/${PACKAGE_NAME_WITH_SUFFIX}.tar.gz" -C "${artifacts_dir}" "${PACKAGE_NAME_WITH_SUFFIX}"
-          rm -rf "${artifacts_dir:?}/${PACKAGE_NAME_WITH_SUFFIX}"
-          echo "Uploaded artifact for ${PACKAGE_NAME_WITH_SUFFIX}"
+          cp "${file}" "${artifacts_dir}/${package_name_with_suffix}/"
+          ls -al "${artifacts_dir}/${package_name_with_suffix}/"
+          tar -czf "${artifacts_dir}/${package_name_with_suffix}.tar.gz" -C "${artifacts_dir}" "${package_name_with_suffix}"
+          rm -rf "${artifacts_dir:?}/${package_name_with_suffix}"
+          echo "Uploaded artifact for ${package_name_with_suffix}"
           echo "qbittorrent_packaged=true" >> $GITHUB_OUTPUT
 
       - name: Upload Package Data
