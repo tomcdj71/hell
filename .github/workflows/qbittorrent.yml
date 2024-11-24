@@ -199,6 +199,7 @@ jobs:
           echo "Checking Qt installation"
           echo $RUNNER_WORKSPACE
           echo $QT_ROOT_DIR
+          tree -L 5 $QT_ROOT_DIR
 
       - name: Checkout qBittorrent Source Code
         if: steps.qbittorrent_update.outputs.update_needed == 'true'
@@ -317,17 +318,16 @@ jobs:
           ls -al "${artifacts_dir}/${package_name_with_suffix}/"
           tar -czf "${artifacts_dir}/${package_name_with_suffix}.tar.gz" -C "${artifacts_dir}" "${package_name_with_suffix}"
           rm -rf "${artifacts_dir:?}/${package_name_with_suffix}"
-          artifact_name="${package_name_with_suffix}.tar.gz"
-          echo "Uploaded artifact for ${package_name_with_suffix}" >> $GITHUB_OUTPUT
+          echo "Uploaded artifact for ${package_name_with_suffix}"
           echo "qbittorrent_packaged=true" >> $GITHUB_OUTPUT
 
       - name: Upload Package Data
         if: steps.generate_deb_files.outputs.qbittorrent_packaged == 'true'
         uses: actions/upload-artifact@v4
         env:
-          artifact_name: ${{ steps.generate_deb_files.outputs.artifact_name }}
+          package_name_with_suffix: ${{ steps.qbittorrent_update.outputs.package_name_with_suffix }}
         with:
-          name: ${artifact_name}
+          name: ${package_name_with_suffix}
           path: ${{ github.workspace }}/artifacts
 
   commit_and_push:
