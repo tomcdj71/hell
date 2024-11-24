@@ -302,11 +302,11 @@ jobs:
               \"version\": \"${full_version}\",
               \"category\": \"transmission\",
               \"build_date\": \"${current_date}\"
-            }" > "${tmp_dir}/${PACKAGE_FILE_NAME}.json"
+            }" > "${tmp_dir}/${package_name_with_suffix}.json"
           echo "Uploading artifact for ${package_name_with_suffix}"
           mkdir -p "${artifacts_dir}/${package_name_with_suffix}"
           cp "${tmp_dir}/${package_name_with_suffix}.json" "${artifacts_dir}/${package_name_with_suffix}/"
-          file=$(find ${pool_path} -type f -name "${PACKAGE_NAME}*.deb")
+          file=$(find ${pool_path} -type f -name "${package_name_with_suffix}*.deb")
           cp "${file}" "${artifacts_dir}/${package_name_with_suffix}/"
           ls -al "${artifacts_dir}/${package_name_with_suffix}/"
           tar -czf "${artifacts_dir}/${package_name_with_suffix}.tar.gz" -C "${artifacts_dir}" "${package_name_with_suffix}"
