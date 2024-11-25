@@ -146,8 +146,9 @@ if [ "$NO_CHECK" = false ]; then
   echo "content of $INSTALL_DIR:"
   rsync -auv --existing "$INSTALL_DIR/" "./"
   if [ "$PACKAGE_NAME" == "libtorrent22" ]; then
-    echo "Creating symlink for libtorrent22"
-    [ ! -e usr/lib/x86_64-linux-gnu/libtorrent.so ] && ln -s usr/lib/x86_64-linux-gnu/libtorrent.so.22.0.0 usr/lib/x86_64-linux-gnu/libtorrent.so
+    if [ ! -f usr/lib/x86_64-linux-gnu/libtorrent.so ]; then
+      [ ! -e usr/lib/x86_64-linux-gnu/libtorrent.so ] && ln -s usr/lib/x86_64-linux-gnu/libtorrent.so.22.0.0 usr/lib/x86_64-linux-gnu/libtorrent.so
+    fi
   fi
   if [ "$PACKAGE_NAME" == "qbittorrent-nox" ]; then
     new_qbittorrent_nox=$(find "$INSTALL_DIR" -type f -name "qbittorrent-nox")
