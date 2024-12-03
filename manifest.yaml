@@ -77,17 +77,17 @@ packages:
     distribution:
     - bookworm
   rtorrent:
-    version: 0.9.8-1build5
-    checksum_sha256: faf8e88317f6ad0266b3ce7f433086c5625fc40b5f915f677498cbccddf77d94
+    version: 0.9.8-1build6
+    checksum_sha256: 04cfc77722370c0b7324febd541bb6dcfd613ca57f280a627eaf053847f5a1c1
     category: libtorrent
-    build_date: '2024-12-01'
+    build_date: '2024-12-03'
     distribution:
     - bookworm
   rtorrent-nightly:
-    version: 0.10.0-1build5
-    checksum_sha256: 722cbea325a4da3c1b1c02aded6626751ae207338eadfb12dc4c36e1bda8d2c7
+    version: 0.10.0-1build6
+    checksum_sha256: 6b303f10bb75dacd74aa536bdb00b353131f54eff24065c2bedaf7076e5efbb7
     category: libtorrent
-    build_date: '2024-12-01'
+    build_date: '2024-12-03'
     distribution:
     - bookworm
   transmission-cli:
