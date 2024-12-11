@@ -92,30 +92,30 @@ packages:
     - bookworm
   transmission-cli:
     version: 4.0.6-1build1
-    checksum_sha256: 6da78adb225b629c810178d4e0ee4747cb99a3c68f85a18aeb8c1f1f764e4734
+    checksum_sha256: 806a77081b6304a9e2a87ace66028aab830054b95f1487bf2e97089ed7aaafb5
     category: transmission
-    build_date: '2024-12-09'
+    build_date: '2024-12-11'
     distribution:
     - bookworm
   transmission-cli-nightly:
     version: 4.1.0-1build1
-    checksum_sha256: c4161854368b758ffe05934564f899c210b7c770451b9794bd2c2ef6cf2eb35e
+    checksum_sha256: 7b6635cd1b181f0bbebea3d3cdabc62160afc5effa49f98e539d0445f1269ad1
     category: transmission
-    build_date: '2024-12-09'
+    build_date: '2024-12-11'
     distribution:
     - bookworm
   transmission-common:
     version: 4.0.6-1build1
-    checksum_sha256: db380116718936a3cea23a68c966c1191b5904b8f36c299d9478ef9c265ef308
+    checksum_sha256: f40ed12e64753ea00cfe42fb7fe63550ad57c4599aebfff413f03beaa76c6c0e
     category: transmission
-    build_date: '2024-12-09'
+    build_date: '2024-12-11'
     distribution:
     - bookworm
   transmission-common-nightly:
     version: 4.1.0-1build1
-    checksum_sha256: c8d6710b642eb423b224100a94d8f4c80d238b97572db7492ffd5593f4a85269
+    checksum_sha256: 1357362d253aef60ae34c43e936ad03ff5bbc074f1878077f5aeb25bdbb9ae14
     category: transmission
-    build_date: '2024-12-09'
+    build_date: '2024-12-11'
     distribution:
     - bookworm
   qbittorrent-nox-nightly:
