@@ -182,10 +182,10 @@ packages:
     distribution:
     - bookworm
   ? ''
-  : version: 1.2.0-1build11
-    checksum_sha256: 841f6d51be9b2e7c8d53311e5629beeec151d12fa393a77cc2ca315244d5ebdd
+  : version: 1.2.0-1build12
+    checksum_sha256: 39c985dad3d9a7add4237fc5fa986e484338973e29f5a7e4aa57a8462682aa6c
     category: mktorrent
-    build_date: '2025-02-09'
+    build_date: '2025-02-16'
     distribution:
     - bookworm
 applications:
